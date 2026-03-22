@@ -1219,35 +1219,28 @@ function nameNext(){
   S.s('userName',n);
   goScreen('relation');
 }
+var _waitingForJoin=null;
 function createRoom(){
   const c=mkCode(),u=uid();
   S.s('userId',u);S.s('room',c);
-  // Save to multi-conn
   const connId=addConnFromSetup(c,u,S.g('userName'),S.g('relation')||'romantic');
   document.getElementById('waiting-code').textContent=c;
   goScreen('waiting');
   mq.subscribe(jtopic(c),{qos:1});
   mq.subscribe(htopic(c),{qos:1});
-  mq.on('message',(t,buf)=>{
-    if(t===jtopic(c)){
-      let d;try{d=JSON.parse(buf.toString())}catch(e){return}
-      if(d.type==='join'&&d.userId!==u){
-        S.s('partnerName',d.name);
-        updateConnPartner(c,d.name);
-        const pw=document.querySelector('#waiting-puppy .anim-float');
-        if(pw)pw.className='anim-pounce';
-        setTimeout(()=>enterApp(),800);
-      }
-    }
-  });
+  // Store join info so the global message handler can detect partner joining
+  _waitingForJoin={room:c,userId:u};
 }
 function joinRoom(){
   const c=document.getElementById('inp-code').value.trim().toUpperCase();
   if(c.length<4||c.length>6){toast(T().enterCode);return}
   const u=uid();S.s('userId',u);S.s('room',c);
   addConnFromSetup(c,u,S.g('userName'),S.g('relation')||'romantic');
-  mq.publish(jtopic(c),JSON.stringify({type:'join',userId:u,name:S.g('userName'),ts:Date.now()}),{qos:1});
+  // Send retained join so creator always sees it (even if reconnecting later)
+  mq.publish(jtopic(c),JSON.stringify({type:'join',userId:u,name:S.g('userName'),ts:Date.now()}),{qos:1,retain:true});
   mq.subscribe(htopic(c),{qos:1});
+  mq.subscribe(topic(c),{qos:1});
+  mq.subscribe(jtopic(c),{qos:1});
   enterApp();
 }
 function shareCode(){const c=S.g('room'),url=location.href.split('?')[0],msg=`Join me on pulse 💌\n${T().yourCodeLbl}: ${c}\n${url}`;if(navigator.share)navigator.share({title:'pulse',text:msg});else{navigator.clipboard?.writeText(msg);toast(T().copied)}}
@@ -1257,24 +1250,40 @@ var _mqttFirstConnect=true;
 function connectMQTT(cb){
   if(typeof mqtt==='undefined'){setTimeout(()=>connectMQTT(cb),300);return}
   const cid='pulse_'+uid();
-  const BROKERS=['wss://broker.hivemq.com:8884/mqtt','wss://broker.emqx.io:8084/mqtt'];
-  let bi=0;
-  function tryB(){
-    mq=mqtt.connect(BROKERS[bi%BROKERS.length],{clientId:cid,clean:true,connectTimeout:8000,reconnectPeriod:4000,keepalive:25});
+  // IMPORTANT: Use ONE broker only so both partners are always on the same one
+  const BROKER='wss://broker.hivemq.com:8884/mqtt';
+  const FALLBACK='wss://broker.emqx.io:8084/mqtt';
+  var useFallback=false;
+
+  function tryConnect(url){
+    mq=mqtt.connect(url,{clientId:cid,clean:true,connectTimeout:10000,reconnectPeriod:3000,keepalive:30});
     mq.on('connect',()=>{
       mqOk=true;setConn(true);
       if(_mqttFirstConnect){_mqttFirstConnect=false;if(cb)cb()}
       else{
-        // Reconnected — resubscribe to room
+        // Reconnected — resubscribe to room and re-announce
         var room=S.g('room');
-        if(room){mq.subscribe(topic(room),{qos:1});mq.subscribe(htopic(room),{qos:1})}
+        if(room){
+          mq.subscribe(topic(room),{qos:1});
+          mq.subscribe(htopic(room),{qos:1});
+          mq.subscribe(jtopic(room),{qos:1});
+          // Re-announce presence so partner knows we're online
+          mq.publish(jtopic(room),JSON.stringify({type:'join',userId:S.g('userId'),name:S.g('userName'),ts:Date.now()}),{qos:1});
+        }
       }
     });
-    mq.on('error',()=>setConn(false));
+    mq.on('error',()=>{
+      setConn(false);
+      // If primary fails on first connect, try fallback ONCE
+      if(_mqttFirstConnect&&!useFallback){
+        useFallback=true;mq.end(true);
+        tryConnect(FALLBACK);
+      }
+    });
     mq.on('close',()=>{mqOk=false;setConn(false)});
-    mq.on('reconnect',()=>{bi++;const t=document.getElementById('ctxt'),d=document.getElementById('sdot');if(t)t.textContent=T().loading.replace('…','');if(d)d.style.background='#C0A888'});
+    mq.on('reconnect',()=>{var t=document.getElementById('ctxt'),d=document.getElementById('sdot');if(t)t.textContent='reconnecting…';if(d)d.style.background='#C0A888'});
   }
-  tryB();
+  tryConnect(BROKER);
 }
 function setConn(ok){const d=document.getElementById('sdot'),t=document.getElementById('ctxt');if(!d||!t)return;d.style.background=ok?'#60A850':'#C0B0A0';t.textContent=ok?'connected':'offline'}
 var _lastPubTime=0;
@@ -1316,33 +1325,58 @@ function enterApp(){
 // ═══ SUBSCRIBE ════════════════════════════════════════════════
 var _subRoomActive=false;
 function subRoom(){
-  const room=S.g('room'),myId=S.g('userId'),since=Date.now()-4000;
+  var room=S.g('room');
   if(!room||!mq)return;
   mq.subscribe(topic(room),{qos:1});
   mq.subscribe(htopic(room),{qos:1});
+  mq.subscribe(jtopic(room),{qos:1});
   // Prevent duplicate listeners
   if(_subRoomActive)return;
   _subRoomActive=true;
-  mq.on('message',(t,buf)=>{
+  mq.on('message',function(t,buf){
     var curRoom=S.g('room'),curId=S.g('userId');
     if(!curRoom)return;
+
+    // Handle join messages (partner connecting)
+    if(t===jtopic(curRoom)){
+      var jd;try{jd=JSON.parse(buf.toString())}catch(e){return}
+      if(jd&&jd.type==='join'&&jd.userId!==curId){
+        S.s('partnerName',jd.name);
+        updateConnPartner(curRoom,jd.name);
+        if(_waitingForJoin&&_waitingForJoin.room===curRoom){
+          _waitingForJoin=null;
+          var pw=document.querySelector('#waiting-puppy .anim-float');
+          if(pw)pw.className='anim-pounce';
+          setTimeout(function(){enterApp()},800);
+        } else {
+          // Update UI with new partner name
+          var tlbl=document.getElementById('to-lbl');if(tlbl)tlbl.textContent='→ '+jd.name;
+          var pdEl=document.getElementById('pname-d');if(pdEl)pdEl.textContent=(S.g('userName')||'')+' & '+jd.name;
+        }
+      }
+      return;
+    }
+
+    // Handle retained history
     if(t===htopic(curRoom)){
       try{
-        const remote=JSON.parse(buf.toString());
+        var remote=JSON.parse(buf.toString());
         if(Array.isArray(remote)&&remote.length>moments.length){
           moments=remote;saveMoments();renderHistory();
         }
       }catch(e){}
       return;
     }
+
     if(t!==topic(curRoom))return;
-    let d;try{d=JSON.parse(buf.toString())}catch(e){return}
+    var d;try{d=JSON.parse(buf.toString())}catch(e){return}
     if(!d||typeof d!=='object')return;
     if(d.type==='animalUpdate'&&d.from!==curId){if(d.key)S.s('animalKey',d.key);if(d.name)S.s('animalName',d.name);updateAnimalUI();return}
     if(d.type==='sound'&&d.from!==curId){receiveSoundNotif(d.soundKey,d.fromName||'');return}
     if(d.type==='treeLocation'||d.type==='treeUpdate'){handleTreeMessage(d);return}
-    if(d.from===curId||d.ts<since)return;
-    const em=curEMs.find(e=>e.key===d.emotion)||curEMs[0];
+    if(d.from===curId)return;
+    // Accept all messages (no time filter — don't miss any)
+    var em=curEMs.find(function(e){return e.key===d.emotion})||curEMs[0];
     var safeMsg=sanitize(d.msg),safeName=sanitize(d.fromName)||'them';
     moments.unshift({em:{key:em.key,name:em.name,sym:em.sym,ac:em.ac,chip:em.chip,grad:em.grad,anim:em.anim},msg:safeMsg,from:safeName,ts:d.ts,mine:false});
     saveMoments();publishHistory();renderHistory();
@@ -2212,7 +2246,23 @@ window.addEventListener('DOMContentLoaded',()=>{
   },7000);
 
   document.addEventListener('visibilitychange',()=>{
-    if(document.visibilityState==='visible'&&!mqOk&&mq)try{mq.reconnect()}catch(e){}
+    if(document.visibilityState==='visible'){
+      // Always try to reconnect when coming back from background
+      if(!mqOk&&mq)try{mq.reconnect()}catch(e){}
+      // Re-subscribe to make sure we don't miss messages
+      var room=S.g('room');
+      if(room&&mq&&mqOk){
+        mq.subscribe(topic(room),{qos:1});
+        mq.subscribe(htopic(room),{qos:1});
+        mq.subscribe(jtopic(room),{qos:1});
+      }
+      // Update connection indicator
+      setConn(mqOk);
+    }
+  });
+  // Also handle iOS page show event (back/forward cache)
+  window.addEventListener('pageshow',function(e){
+    if(e.persisted&&!mqOk&&mq)try{mq.reconnect()}catch(ex){}
   });
 
   setInterval(()=>{
@@ -2223,7 +2273,27 @@ window.addEventListener('DOMContentLoaded',()=>{
 <script>
 // ═══ SERVICE WORKER + PWA ═══════════════════════════════════════
 if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('sw.js').catch(()=>{});
+  navigator.serviceWorker.register('sw.js').then(function(reg){
+    // Check for updates every 60 seconds
+    setInterval(function(){reg.update()},60000);
+    // When new SW found, activate immediately
+    reg.addEventListener('updatefound',function(){
+      var newSW=reg.installing;
+      if(newSW){
+        newSW.addEventListener('statechange',function(){
+          if(newSW.state==='installed'&&navigator.serviceWorker.controller){
+            // New version available — force activate
+            newSW.postMessage('skipWaiting');
+          }
+        });
+      }
+    });
+  }).catch(function(){});
+  // Reload when new SW takes over
+  var _refreshing=false;
+  navigator.serviceWorker.addEventListener('controllerchange',function(){
+    if(!_refreshing){_refreshing=true;location.reload()}
+  });
 }
 
 // ═══ BROWSER BACK BUTTON SUPPORT ═══════════════════════════════
