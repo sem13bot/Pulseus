@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pulse-v30';
+const CACHE_NAME = 'pulse-v31';
 const ASSETS = [
   './',
   './index.html',
@@ -54,18 +54,31 @@ self.addEventListener('fetch', e => {
 
 // Handle notification clicks — open or focus the app
 self.addEventListener('notificationclick', e => {
+  const action = e.action;
   e.notification.close();
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+      // Try to focus an existing window
       for (const client of clients) {
         if (client.url.includes('index.html') || client.url.endsWith('/')) {
-          return client.focus();
+          client.focus();
+          // If reply action, tell the page to open reply
+          if (action === 'reply') {
+            client.postMessage({ type: 'notif-reply' });
+          }
+          return;
         }
       }
+      // No existing window — open a new one
       const url = (e.notification.data && e.notification.data.url) || './index.html';
       return self.clients.openWindow(url);
     })
   );
+});
+
+// Handle notification close (dismissed without clicking)
+self.addEventListener('notificationclose', e => {
+  // Nothing needed, but prevents errors
 });
 
 // Listen for messages from the page
