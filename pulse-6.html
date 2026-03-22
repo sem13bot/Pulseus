@@ -1,0 +1,924 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>pulse</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="pulse">
+<meta name="theme-color" content="#1A0A06">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/mqtt@5.3.4/dist/mqtt.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#0D0504}
+body{font-family:'DM Sans',sans-serif;display:flex;justify-content:center;overscroll-behavior:none}
+#app{width:100%;max-width:430px;min-height:100dvh;position:relative;overflow:hidden;background:#1A0A06}
+:root{
+  --st:env(safe-area-inset-top,44px);
+  --sb:env(safe-area-inset-bottom,20px);
+  --ac:#D05070;--chip:rgba(208,80,112,.45);
+  --grad:radial-gradient(ellipse at 30% 20%,#3D1020 0%,#1A0A06 65%);
+}
+.screen{position:absolute;inset:0;display:none;flex-direction:column;overflow:hidden}
+.screen.active{display:flex}
+
+/* Animations */
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{transform:translateY(34px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes scaleIn{from{transform:scale(.86);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+@keyframes tilt{0%,100%{transform:rotate(0) translateY(0)}32%{transform:rotate(-14deg) translateY(-6px)}66%{transform:rotate(10deg) translateY(-3px)}}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+@keyframes bounce{0%,100%{transform:translateY(0)}25%{transform:translateY(-20px)}55%{transform:translateY(-7px)}}
+@keyframes beat{0%,100%{transform:scale(1)}50%{transform:scale(1.09)}}
+@keyframes ripple{from{transform:scale(1);opacity:.55}to{transform:scale(2.9);opacity:0}}
+@keyframes floatUp{0%{transform:translateY(0) scale(1);opacity:.9}100%{transform:translateY(-92px) scale(.15);opacity:0}}
+@keyframes wagTail{0%,100%{transform:rotate(0)}36%{transform:rotate(22deg)}68%{transform:rotate(-17deg)}}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@keyframes shimmer{0%,100%{opacity:.42}50%{opacity:1}}
+@keyframes slideInUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes glow{0%,100%{box-shadow:0 0 0 0 rgba(208,80,112,.4)}50%{box-shadow:0 0 0 26px rgba(208,80,112,0)}}
+@keyframes dotBlink{0%,80%,100%{opacity:.15}40%{opacity:1}}
+@keyframes grain{0%,100%{transform:translate(0,0)}20%{transform:translate(-2%,-3%)}40%{transform:translate(3%,-1%)}60%{transform:translate(-1%,3%)}80%{transform:translate(2%,1%)}
+}
+
+/* Grain overlay */
+#app::after{content:'';position:fixed;inset:-50%;width:200%;height:200%;pointer-events:none;z-index:998;opacity:.025;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation:grain 9s steps(10) infinite}
+
+/* ═══ LOADING ═══ */
+#loading{position:fixed;inset:0;z-index:500;background:#1A0A06;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px}
+.spin-ring{width:34px;height:34px;border:2px solid rgba(192,64,94,.15);border-top-color:#C0405E;border-radius:50%;animation:spin .85s linear infinite}
+#loading p{font-family:'Cormorant Garamond',serif;font-size:20px;font-style:italic;color:rgba(200,170,160,.32)}
+
+/* ═══ SETUP ═══ */
+#screen-setup{background:radial-gradient(ellipse at 28% 18%,#3D1020 0%,#1A0A06 60%);align-items:center;justify-content:space-between;padding:calc(var(--st) + 48px) 28px calc(var(--sb) + 48px)}
+.logo-wrap{text-align:center}
+.logo{font-family:'Cormorant Garamond',serif;font-size:76px;font-weight:300;letter-spacing:10px;color:#E8C8C0;text-shadow:0 0 90px rgba(192,64,94,.6);animation:shimmer 3.5s ease-in-out infinite;display:block;line-height:1}
+.logo-sub{font-size:9px;color:#5A3830;letter-spacing:5px;text-transform:uppercase;margin-top:8px}
+
+.glass{width:100%;max-width:340px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:32px;padding:32px 26px;backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);animation:scaleIn .5s ease}
+.glass h2{font-family:'Cormorant Garamond',serif;font-size:30px;font-weight:300;color:#E8D8D0;margin-bottom:26px;line-height:1.2}
+
+.field{width:100%;background:rgba(255,255,255,.055);border:1.5px solid rgba(255,255,255,.09);border-radius:18px;padding:16px 20px;font-family:'DM Sans',sans-serif;font-size:15px;color:#E8D8D0;outline:none;margin-bottom:14px;transition:border-color .2s;-webkit-appearance:none}
+.field::placeholder{color:rgba(200,170,160,.28)}
+.field:focus{border-color:rgba(208,80,112,.48)}
+.field-code{text-align:center;letter-spacing:12px;font-size:28px;text-transform:uppercase}
+
+.cta{width:100%;border:none;border-radius:50px;padding:18px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;letter-spacing:.4px;transition:all .22s;color:white}
+.cta-rose{background:linear-gradient(135deg,#C0405E,#8B2040);box-shadow:0 10px 34px rgba(192,64,94,.38)}
+.cta-indigo{background:linear-gradient(135deg,#5B50A2,#3B3080);box-shadow:0 10px 34px rgba(91,80,162,.32)}
+.cta:active{transform:scale(.97)}
+
+.div{text-align:center;font-size:10px;color:rgba(200,170,160,.16);letter-spacing:3px;margin:14px 0}
+.code-box{background:rgba(192,64,94,.08);border:1px solid rgba(192,64,94,.18);border-radius:24px;padding:26px;text-align:center;margin:18px 0}
+.big-code{font-family:'Cormorant Garamond',serif;font-size:60px;font-weight:300;color:#C0405E;letter-spacing:16px;text-shadow:0 0 50px rgba(192,64,94,.45);line-height:1}
+.code-hint{font-size:9px;color:rgba(192,64,94,.38);letter-spacing:3px;text-transform:uppercase;margin-top:8px;display:block}
+.wait-txt{font-size:12px;color:rgba(200,170,160,.28);text-align:center;margin-top:16px}
+.dots span{animation:dotBlink 1.6s ease-in-out infinite;display:inline-block}
+.dots span:nth-child(2){animation-delay:.26s}
+.dots span:nth-child(3){animation-delay:.52s}
+
+/* ═══ SEND SCREEN ═══ */
+#screen-send{transition:background .55s ease;background:var(--grad)}
+.topbar{padding:calc(var(--st) + 14px) 22px 0;display:flex;justify-content:space-between;align-items:center}
+.to-lbl{font-family:'Cormorant Garamond',serif;font-size:13px;letter-spacing:4.5px;text-transform:uppercase;opacity:.52;transition:color .45s}
+.cbadge{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:50px;padding:7px 16px;font-size:10px;color:rgba(200,170,160,.42);font-family:'DM Sans',sans-serif;letter-spacing:.5px;display:flex;align-items:center;gap:6px;cursor:pointer}
+.sdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;transition:background .5s}
+
+/* Puppy */
+.puppy-zone{display:flex;justify-content:center;padding:8px 0 2px;flex-shrink:0}
+.pf{animation:float 3.4s ease-in-out infinite}
+.pt{animation:tilt 2.9s ease-in-out infinite}
+.pb{animation:breathe 3.8s ease-in-out infinite}
+.po{animation:bounce .95s ease-in-out infinite}
+
+/* Emotion row */
+.emo-row{display:flex;align-items:center;justify-content:center;gap:22px;padding:4px 0 2px}
+.arr{background:none;border:none;font-size:32px;color:rgba(200,170,160,.2);cursor:pointer;padding:8px 14px;line-height:1;transition:color .2s}
+.arr:active{color:rgba(200,170,160,.7)}
+.emo-mid{text-align:center;min-width:164px}
+.esym{font-size:42px;display:block;line-height:1;transition:color .4s}
+.ename{font-family:'Cormorant Garamond',serif;font-size:25px;font-weight:300;margin-top:4px;transition:color .4s}
+
+/* Heart button */
+.heart-zone{display:flex;flex-direction:column;align-items:center;padding:10px 0 8px;position:relative;flex-shrink:0}
+.rring{position:absolute;width:126px;height:126px;border-radius:50%;border:2px solid var(--ac);pointer-events:none;opacity:0}
+.rring.fire{animation:ripple .85s ease-out forwards}
+.ptcls{position:absolute;pointer-events:none;inset:0;overflow:hidden}
+.ptcl{position:absolute;font-size:16px;animation:floatUp 1s ease-out forwards;opacity:0}
+#hbtn{width:126px;height:126px;border-radius:50%;background:rgba(255,255,255,.04);border:2px solid var(--chip);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:56px;line-height:1;transition:all .3s;animation:beat 4s ease-in-out infinite;position:relative;z-index:1;-webkit-appearance:none;color:var(--ac);box-shadow:0 16px 60px rgba(208,80,112,.15)}
+#hbtn.go{animation:glow .65s ease-in-out infinite;transform:scale(.92)}
+#hbtn:active{transform:scale(.88)}
+.tap-hint{font-size:9px;letter-spacing:3.5px;text-transform:uppercase;color:rgba(200,170,160,.24);margin-top:11px;transition:opacity .3s}
+
+/* Message panel */
+.msg-panel{flex:1;margin:4px 14px 0;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.055);border-radius:24px 24px 0 0;padding:16px 15px 10px;display:flex;flex-direction:column;overflow:hidden;backdrop-filter:blur(12px)}
+.plbl{font-size:9px;color:rgba(200,170,160,.24);letter-spacing:3px;text-transform:uppercase;margin-bottom:10px}
+.mopts{display:flex;flex-direction:column;gap:7px;margin-bottom:10px}
+.mchip{background:transparent;border:1.5px solid rgba(255,255,255,.07);border-radius:13px;padding:10px 15px;text-align:left;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;color:rgba(200,170,160,.42);transition:all .2s;line-height:1.4;-webkit-appearance:none}
+.mchip.on{color:var(--ac);border-color:var(--chip);background:rgba(255,255,255,.045)}
+.crow{margin-top:2px}
+.cfield{width:100%;background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.07);border-radius:13px;padding:10px 15px;font-family:'DM Sans',sans-serif;font-size:13px;color:#E8D8D0;outline:none;transition:border-color .2s;-webkit-appearance:none}
+.cfield::placeholder{color:rgba(200,170,160,.26);font-style:italic}
+.cfield:focus{border-color:var(--chip)}
+
+/* ═══ BOTTOM NAV ═══ */
+.bnav{display:flex;justify-content:space-around;align-items:center;padding:10px 0 calc(var(--sb) + 10px);background:rgba(0,0,0,.5);border-top:1px solid rgba(255,255,255,.05);backdrop-filter:blur(24px);flex-shrink:0}
+.nb{background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 28px}
+.ni{font-size:23px;line-height:1;transition:color .3s}
+.nl{font-size:9px;letter-spacing:.6px;transition:color .3s;font-family:'DM Sans',sans-serif}
+
+/* ═══ HISTORY ═══ */
+#screen-history{background:#1A0A06}
+.hhead{padding:calc(var(--st) + 18px) 28px 14px;border-bottom:1px solid rgba(255,255,255,.05)}
+.hhead h1{font-family:'Cormorant Garamond',serif;font-size:46px;font-weight:300;color:#E8D8D0;line-height:1}
+.hhead p{font-size:12px;color:rgba(200,170,160,.32);margin-top:4px}
+.hlist{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:9px}
+.hlist::-webkit-scrollbar{display:none}
+.mcard{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06);border-radius:22px;padding:14px 17px;display:flex;align-items:center;gap:14px;animation:slideUp .4s ease both}
+.mico{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.mbody{flex:1;min-width:0}
+.mname{font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:400}
+.mmsg{font-size:11px;color:rgba(200,170,160,.38);margin-top:3px;font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mfrom{font-size:10px;color:rgba(200,170,160,.24);margin-top:3px}
+.mtime{font-size:10px;color:rgba(200,170,160,.22);flex-shrink:0}
+.empty{text-align:center;padding:80px 0;font-family:'Cormorant Garamond',serif;font-size:25px;color:rgba(200,170,160,.17);line-height:1.8}
+
+/* ═══ SETTINGS ═══ */
+#screen-settings{background:#1A0A06}
+.shead{padding:calc(var(--st) + 18px) 28px 14px}
+.shead h1{font-family:'Cormorant Garamond',serif;font-size:46px;font-weight:300;color:#E8D8D0}
+.slist{flex:1;overflow-y:auto;padding:0 14px 16px;display:flex;flex-direction:column;gap:9px}
+.slist::-webkit-scrollbar{display:none}
+.scard{background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.06);border-radius:22px;padding:20px}
+.slbl{font-size:9px;color:rgba(200,170,160,.26);letter-spacing:3px;text-transform:uppercase;margin-bottom:15px}
+.srow{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0}
+.srow+.srow{border-top:1px solid rgba(255,255,255,.05);margin-top:6px;padding-top:12px}
+.srt strong{font-size:14px;color:#D8C8C0;font-weight:400;display:block}
+.srt span{font-size:11px;color:rgba(200,170,160,.28)}
+.tog{width:50px;height:28px;border-radius:14px;border:none;cursor:pointer;position:relative;transition:background .3s;flex-shrink:0}
+.tth{width:22px;height:22px;border-radius:50%;background:white;position:absolute;top:3px;transition:left .3s;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+.vgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.vchip{background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.06);border-radius:15px;padding:14px;cursor:pointer;transition:all .22s}
+.vchip.on{background:rgba(255,255,255,.07)}
+.vsym{font-size:22px;display:block;margin-bottom:5px}
+.vcname{font-size:11px;font-weight:400}
+.vpat{font-size:11px;color:rgba(200,170,160,.25);letter-spacing:2px;margin-top:3px}
+.vdesc{margin-top:10px;padding:11px 15px;background:rgba(255,255,255,.04);border-radius:13px;font-size:12px;display:none;color:rgba(200,170,160,.52);line-height:1.5}
+.prow{display:flex;align-items:center;gap:14px}
+.pava{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,rgba(192,64,94,.38),rgba(139,32,64,.58));border:1px solid rgba(192,64,94,.22);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.pinfo strong{font-size:14px;color:#D8C8C0;font-weight:400;display:block}
+.pinfo span{font-size:11px;color:rgba(200,170,160,.32)}
+
+/* ═══ RECEIVE OVERLAY ═══ */
+#rcover{position:fixed;inset:0;z-index:100;display:none;flex-direction:column;align-items:center;justify-content:space-between;padding:calc(var(--st) + 56px) 32px calc(var(--sb) + 52px);animation:slideInUp .5s ease}
+#rcover.show{display:flex}
+.rfrom{font-family:'Cormorant Garamond',serif;font-size:13px;letter-spacing:4.5px;text-transform:uppercase;opacity:.48}
+.rbody{display:flex;flex-direction:column;align-items:center;gap:22px;animation:slideUp .65s .2s ease both}
+.resym{font-size:56px;display:block;margin-bottom:-6px}
+.rename{font-family:'Cormorant Garamond',serif;font-size:40px;font-weight:300;text-align:center;line-height:1}
+.remsg{font-family:'Cormorant Garamond',serif;font-style:italic;font-size:23px;line-height:1.58;text-align:center;max-width:282px;color:rgba(220,200,190,.78)}
+.racts{width:100%;display:flex;flex-direction:column;gap:12px}
+.rbtn{width:100%;border:none;border-radius:50px;padding:19px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;color:white;letter-spacing:.3px;transition:all .2s}
+.rbtn:active{transform:scale(.97)}
+.rdis{background:transparent;color:rgba(200,170,160,.26);border:none;padding:10px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer}
+
+/* ═══ TOAST ═══ */
+#toast{position:fixed;bottom:calc(var(--sb) + 92px);left:50%;transform:translateX(-50%) translateY(14px);background:rgba(20,8,4,.92);color:rgba(220,200,190,.88);border:1px solid rgba(255,255,255,.08);border-radius:50px;padding:12px 24px;font-size:13px;opacity:0;pointer-events:none;transition:all .32s;z-index:300;white-space:nowrap;backdrop-filter:blur(16px);font-family:'DM Sans',sans-serif}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ═══ iOS BANNER ═══ */
+#iosbanner{position:fixed;top:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;background:linear-gradient(135deg,#8B2040,#4A0820);color:rgba(255,255,255,.88);padding:calc(var(--st) + 14px) 20px 18px;font-size:13px;line-height:1.7;z-index:200;box-shadow:0 4px 28px rgba(0,0,0,.5);display:none;font-family:'DM Sans',sans-serif}
+#iosbanner.show{display:block}
+#iosbanner strong{display:block;font-size:15px;margin-bottom:4px;font-weight:500;font-family:'Cormorant Garamond',serif;letter-spacing:.5px}
+#iosbanner .xb{position:absolute;top:calc(var(--st) + 14px);right:18px;background:none;border:none;color:rgba(255,255,255,.4);font-size:22px;cursor:pointer;line-height:1}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="spin-ring"></div>
+  <p>connecting…</p>
+</div>
+
+<!-- ═══════════ SETUP ═══════════ -->
+<div id="screen-setup" class="screen">
+  <div class="logo-wrap">
+    <span class="logo">pulse</span>
+    <div class="logo-sub">a private emotional shortcut</div>
+  </div>
+
+  <div class="glass" id="step-name">
+    <h2>What's your name?</h2>
+    <input class="field" id="inp-name" placeholder="Your name…" maxlength="24" autocomplete="off" autocorrect="off" spellcheck="false">
+    <button class="cta cta-rose" onclick="nameNext()">Continue →</button>
+  </div>
+
+  <div class="glass" id="step-choice" style="display:none">
+    <h2>Your connection</h2>
+    <button class="cta cta-rose" onclick="createRoom()">💛  Create our connection</button>
+    <div class="div">— or —</div>
+    <input class="field field-code" id="inp-code" placeholder="CODE" maxlength="4" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+    <button class="cta cta-indigo" onclick="joinRoom()" style="margin-top:4px">Join with code</button>
+  </div>
+
+  <div class="glass" id="step-wait" style="display:none">
+    <h2>Share this code 💌</h2>
+    <div class="code-box">
+      <div class="big-code" id="show-code">----</div>
+      <span class="code-hint">your connection code</span>
+    </div>
+    <p style="font-size:12px;color:rgba(200,170,160,.36);text-align:center;line-height:1.75;margin-bottom:18px">
+      Send to your person.<br>
+      They open the same link → "Join with code".
+    </p>
+    <button class="cta cta-rose" onclick="shareCode()">Share code →</button>
+    <div class="wait-txt dots" style="margin-top:18px">
+      Waiting for your person<span>.</span><span>.</span><span>.</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ SEND ═══════════ -->
+<div id="screen-send" class="screen">
+  <div class="topbar">
+    <div class="to-lbl" id="to-lbl">to my person</div>
+    <div class="cbadge" onclick="askNotif()">
+      <span class="sdot" id="sdot" style="background:#333"></span>
+      <span id="ctxt">connecting</span>
+    </div>
+  </div>
+
+  <!-- PUPPY SVG -->
+  <div class="puppy-zone">
+    <div id="pw" class="pf">
+      <svg width="96" height="108" viewBox="0 0 100 112" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- ears -->
+        <ellipse cx="26" cy="37" rx="13.5" ry="21" fill="#B87050" transform="rotate(-18 26 37)"/>
+        <ellipse cx="26" cy="39" rx="7.5" ry="13" fill="#DFA880" transform="rotate(-18 26 39)"/>
+        <ellipse cx="74" cy="37" rx="13.5" ry="21" fill="#B87050" transform="rotate(18 74 37)"/>
+        <ellipse cx="74" cy="39" rx="7.5" ry="13" fill="#DFA880" transform="rotate(18 74 39)"/>
+        <!-- head -->
+        <circle cx="50" cy="55" r="28" fill="#D8A87A"/>
+        <ellipse cx="50" cy="43" rx="16" ry="10" fill="#C4896A" opacity=".32"/>
+        <!-- eyes -->
+        <circle cx="40" cy="52" r="5.2" fill="#1C0C06"/>
+        <circle cx="41.8" cy="50.2" r="2.1" fill="white" opacity=".88"/>
+        <circle cx="60" cy="52" r="5.2" fill="#1C0C06"/>
+        <circle cx="61.8" cy="50.2" r="2.1" fill="white" opacity=".88"/>
+        <!-- blush -->
+        <circle cx="32" cy="60" r="7" fill="#F09898" opacity=".2"/>
+        <circle cx="68" cy="60" r="7" fill="#F09898" opacity=".2"/>
+        <!-- nose -->
+        <ellipse cx="50" cy="61.5" rx="4.8" ry="3.2" fill="#1C0C06"/>
+        <ellipse cx="48.6" cy="60.4" rx="1.6" ry="1.1" fill="white" opacity=".34"/>
+        <!-- mouth -->
+        <path d="M44 67Q50 73 56 67" stroke="#1C0C06" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+        <!-- body -->
+        <ellipse cx="50" cy="96" rx="20" ry="14" fill="#D8A87A"/>
+        <!-- tail -->
+        <path d="M68 91Q86 77 79 63" stroke="#C4896A" stroke-width="9.5" stroke-linecap="round" fill="none"
+          style="transform-origin:68px 91px;animation:wagTail .95s ease-in-out infinite"/>
+        <!-- paws -->
+        <ellipse cx="37" cy="108" rx="8.5" ry="5.5" fill="#C4896A"/>
+        <ellipse cx="63" cy="108" rx="8.5" ry="5.5" fill="#C4896A"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- Emotion selector -->
+  <div class="emo-row">
+    <button class="arr" onclick="switchE(-1)">&#8249;</button>
+    <div class="emo-mid">
+      <span class="esym" id="esym">♡</span>
+      <div class="ename" id="ename">Miss You</div>
+    </div>
+    <button class="arr" onclick="switchE(1)">&#8250;</button>
+  </div>
+
+  <!-- Heart button -->
+  <div class="heart-zone">
+    <div class="rring" id="rring"></div>
+    <div class="ptcls" id="ptcls"></div>
+    <button id="hbtn" onclick="sendMoment()">♡</button>
+    <div class="tap-hint" id="taphint">tap to send</div>
+  </div>
+
+  <!-- Messages -->
+  <div class="msg-panel">
+    <div class="plbl">Message</div>
+    <div class="mopts" id="mopts"></div>
+    <div class="crow">
+      <input class="cfield" id="cmsg" placeholder="or write something small…" maxlength="80" autocomplete="off" autocorrect="off">
+    </div>
+  </div>
+
+  <nav class="bnav">
+    <button class="nb" onclick="goTo('history')">
+      <span class="ni" style="color:rgba(200,170,160,.2)">○</span>
+      <span class="nl" style="color:rgba(200,170,160,.2)">Moments</span>
+    </button>
+    <button class="nb" onclick="goTo('send')">
+      <span class="ni" id="nsend" style="color:#D05070">♡</span>
+      <span class="nl" id="nlsend" style="color:#D05070">Send</span>
+    </button>
+    <button class="nb" onclick="goTo('settings')">
+      <span class="ni" style="color:rgba(200,170,160,.2)">···</span>
+      <span class="nl" style="color:rgba(200,170,160,.2)">Settings</span>
+    </button>
+  </nav>
+</div>
+
+<!-- ═══════════ HISTORY ═══════════ -->
+<div id="screen-history" class="screen">
+  <div class="hhead">
+    <h1>Moments</h1>
+    <p>Your tiny history together</p>
+  </div>
+  <div class="hlist" id="hlist">
+    <div class="empty">No moments yet.<br>Send your first feeling.</div>
+  </div>
+  <nav class="bnav">
+    <button class="nb" onclick="goTo('history')">
+      <span class="ni" style="color:#D05070">○</span>
+      <span class="nl" style="color:#D05070">Moments</span>
+    </button>
+    <button class="nb" onclick="goTo('send')">
+      <span class="ni" style="color:rgba(200,170,160,.2)">♡</span>
+      <span class="nl" style="color:rgba(200,170,160,.2)">Send</span>
+    </button>
+    <button class="nb" onclick="goTo('settings')">
+      <span class="ni" style="color:rgba(200,170,160,.2)">···</span>
+      <span class="nl" style="color:rgba(200,170,160,.2)">Settings</span>
+    </button>
+  </nav>
+</div>
+
+<!-- ═══════════ SETTINGS ═══════════ -->
+<div id="screen-settings" class="screen">
+  <div class="shead"><h1>Settings</h1></div>
+  <div class="slist">
+
+    <div class="scard">
+      <div class="slbl">Vibration Language</div>
+      <div class="vgrid" id="vgrid"></div>
+      <div class="vdesc" id="vdesc"></div>
+    </div>
+
+    <div class="scard">
+      <div class="srow">
+        <div class="srt"><strong>Vibration</strong><span>Feel it before reading</span></div>
+        <button class="tog" id="tog-v" style="background:#C0405E" onclick="togS('vibe',this)">
+          <div class="tth" style="left:25px"></div>
+        </button>
+      </div>
+      <div class="srow">
+        <div class="srt"><strong>Puppy animations</strong><span>Animate on arrival</span></div>
+        <button class="tog" id="tog-a" style="background:#C0405E" onclick="togS('anim',this)">
+          <div class="tth" style="left:25px"></div>
+        </button>
+      </div>
+    </div>
+
+    <div class="scard">
+      <div class="slbl">Connection</div>
+      <div class="prow">
+        <div class="pava">♡</div>
+        <div class="pinfo">
+          <strong id="pname-d">—</strong>
+          <span id="proom-d">Room: ···</span>
+        </div>
+      </div>
+      <div style="margin-top:20px;display:flex;flex-direction:column;gap:10px">
+        <button onclick="askNotif()" style="background:none;border:1px solid rgba(192,64,94,.25);border-radius:50px;padding:13px 20px;color:rgba(192,64,94,.6);font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;width:100%;letter-spacing:.3px">
+          Enable lock screen notifications 🔔
+        </button>
+        <button onclick="disconnect()" style="background:none;border:none;color:rgba(200,90,90,.36);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer;padding:4px 0;text-align:left">
+          Disconnect &amp; reset
+        </button>
+      </div>
+    </div>
+
+    <div style="text-align:center;padding:22px 0 10px">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:20px;color:rgba(200,170,160,.16);font-style:italic;letter-spacing:.5px">
+        pulse
+      </div>
+    </div>
+  </div>
+  <nav class="bnav">
+    <button class="nb" onclick="goTo('history')">
+      <span class="ni" style="color:rgba(200,170,160,.2)">○</span>
+      <span class="nl" style="color:rgba(200,170,160,.2)">Moments</span>
+    </button>
+    <button class="nb" onclick="goTo('send')">
+      <span class="ni" style="color:rgba(200,170,160,.2)">♡</span>
+      <span class="nl" style="color:rgba(200,170,160,.2)">Send</span>
+    </button>
+    <button class="nb" onclick="goTo('settings')">
+      <span class="ni" style="color:#D05070">···</span>
+      <span class="nl" style="color:#D05070">Settings</span>
+    </button>
+  </nav>
+</div>
+
+<!-- ═══════════ RECEIVE OVERLAY ═══════════ -->
+<div id="rcover">
+  <div class="rfrom" id="rfrom">from my person</div>
+  <div class="rbody">
+    <div id="rpw" class="pf">
+      <svg width="138" height="155" viewBox="0 0 100 112" fill="none">
+        <ellipse cx="26" cy="37" rx="13.5" ry="21" fill="#B87050" transform="rotate(-18 26 37)"/>
+        <ellipse cx="26" cy="39" rx="7.5" ry="13" fill="#DFA880" transform="rotate(-18 26 39)"/>
+        <ellipse cx="74" cy="37" rx="13.5" ry="21" fill="#B87050" transform="rotate(18 74 37)"/>
+        <ellipse cx="74" cy="39" rx="7.5" ry="13" fill="#DFA880" transform="rotate(18 74 39)"/>
+        <circle cx="50" cy="55" r="28" fill="#D8A87A"/>
+        <ellipse cx="50" cy="43" rx="16" ry="10" fill="#C4896A" opacity=".32"/>
+        <circle cx="40" cy="52" r="5.2" fill="#1C0C06"/>
+        <circle cx="41.8" cy="50.2" r="2.1" fill="white" opacity=".88"/>
+        <circle cx="60" cy="52" r="5.2" fill="#1C0C06"/>
+        <circle cx="61.8" cy="50.2" r="2.1" fill="white" opacity=".88"/>
+        <circle cx="32" cy="60" r="7" fill="#F09898" opacity=".2"/>
+        <circle cx="68" cy="60" r="7" fill="#F09898" opacity=".2"/>
+        <ellipse cx="50" cy="61.5" rx="4.8" ry="3.2" fill="#1C0C06"/>
+        <ellipse cx="48.6" cy="60.4" rx="1.6" ry="1.1" fill="white" opacity=".34"/>
+        <path d="M44 67Q50 73 56 67" stroke="#1C0C06" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+        <ellipse cx="50" cy="96" rx="20" ry="14" fill="#D8A87A"/>
+        <path d="M68 91Q86 77 79 63" stroke="#C4896A" stroke-width="9.5" stroke-linecap="round" fill="none"
+          style="transform-origin:68px 91px;animation:wagTail .95s ease-in-out infinite"/>
+        <ellipse cx="37" cy="108" rx="8.5" ry="5.5" fill="#C4896A"/>
+        <ellipse cx="63" cy="108" rx="8.5" ry="5.5" fill="#C4896A"/>
+      </svg>
+    </div>
+    <span class="resym" id="resym">♡</span>
+    <div class="rename" id="rename">Miss You</div>
+    <div class="remsg" id="remsg">"I miss you right now"</div>
+  </div>
+  <div class="racts">
+    <button class="rbtn" id="rbtn" onclick="replyBack()">Send love back ♡</button>
+    <button class="rdis" onclick="closeRcv()">Close</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div id="iosbanner">
+  <button class="xb" onclick="this.parentElement.classList.remove('show')">×</button>
+  <strong>📲 Add pulse to your Home Screen</strong>
+  Safari → Share ↑ → "Add to Home Screen" → then lock screen notifications work perfectly.
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//  EMOTIONS
+// ═══════════════════════════════════════
+const EM = [
+  { key:'miss', name:'Miss You', sym:'♡',
+    ac:'#D05070', chip:'rgba(208,80,112,.42)',
+    grad:'radial-gradient(ellipse at 28% 18%,#3D1020 0%,#1A0A06 62%)',
+    anim:'pf',
+    msgs:['I miss you right now','You popped into my head','I suddenly wanted you near','A small wave of missing you'],
+    vibe:[80,60,80], vpat:'•• ••', vdesc:'Gentle heartbeat double pulse — soft longing' },
+  { key:'thinking', name:'Thinking of You', sym:'✦',
+    ac:'#8878D8', chip:'rgba(136,120,216,.42)',
+    grad:'radial-gradient(ellipse at 72% 22%,#1E1640 0%,#0E0A1A 62%)',
+    anim:'pt',
+    msgs:['You crossed my mind','Just thought about you','In the middle of everything, you appeared','Tiny moment, big thought of you'],
+    vibe:[60], vpat:'•', vdesc:'One short clean pulse — gentle presence' },
+  { key:'hug', name:'Need a Hug', sym:'◡',
+    ac:'#C88040', chip:'rgba(200,128,64,.42)',
+    grad:'radial-gradient(ellipse at 38% 28%,#3A2010 0%,#1A0E06 62%)',
+    anim:'pb',
+    msgs:['I need your hug','I wish I could hold you right now','I need a little closeness','Soft moment, missing your comfort'],
+    vibe:[300], vpat:'────', vdesc:'One long comforting vibration — warmth and closeness' },
+  { key:'desire', name:'Desire', sym:'⚡',
+    ac:'#C83050', chip:'rgba(200,48,80,.42)',
+    grad:'radial-gradient(ellipse at 62% 18%,#380C18 0%,#1A0608 62%)',
+    anim:'po',
+    msgs:['I really want you right now','You are on my mind in that way','Sending you a stronger kind of missing','This one comes with heat'],
+    vibe:[50,30,50,30,80], vpat:'•••', vdesc:'Quick strong energetic pattern — intensity' }
+];
+
+// ═══════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════
+let mq = null, mqOk = false;
+let eIdx = 0, selMsg = null;
+let moments = [], sett = {vibe:true, anim:true};
+const S = {
+  g: k => localStorage.getItem('px_'+k),
+  s: (k,v) => localStorage.setItem('px_'+k,v),
+  d: k => localStorage.removeItem('px_'+k)
+};
+const uid = () => Math.random().toString(36).slice(2,12);
+const mkCode = () => {
+  const a='ABCDEFGHJKLMNPQRSTUVWXYZ';
+  return Array.from({length:4},()=>a[Math.floor(Math.random()*a.length)]).join('');
+};
+const topic = r => `pulse/v3/${r}`;
+const jtopic = r => `pulse/v3/${r}/join`;
+
+// ═══════════════════════════════════════
+//  MQTT — HiveMQ public broker
+// ═══════════════════════════════════════
+function connectMQTT(cb) {
+  const cid = 'pulse_' + uid();
+  mq = mqtt.connect('wss://broker.hivemq.com:8884/mqtt', {
+    clientId: cid, clean: true,
+    connectTimeout: 10000,
+    reconnectPeriod: 3500,
+    keepalive: 25
+  });
+  mq.on('connect', () => {
+    mqOk = true; setConn(true);
+    console.log('✓ MQTT connected');
+    if (cb) cb();
+  });
+  mq.on('error',   () => setConn(false));
+  mq.on('close',   () => { mqOk = false; setConn(false); });
+  mq.on('reconnect', () => {
+    const t = document.getElementById('ctxt');
+    const d = document.getElementById('sdot');
+    if(t) t.textContent='reconnecting';
+    if(d) d.style.background='#8B6030';
+  });
+}
+
+function setConn(ok) {
+  const d = document.getElementById('sdot');
+  const t = document.getElementById('ctxt');
+  if(!d||!t) return;
+  d.style.background = ok ? '#4CAF50' : '#444';
+  t.textContent = ok ? 'connected' : 'offline';
+}
+
+function pub(room, payload) {
+  return new Promise((res,rej) => {
+    if(!mq||!mqOk){ rej(new Error('offline')); return; }
+    mq.publish(topic(room), JSON.stringify(payload), {qos:1}, e => e?rej(e):res());
+  });
+}
+
+// ═══════════════════════════════════════
+//  SETUP
+// ═══════════════════════════════════════
+function nameNext() {
+  const n = document.getElementById('inp-name').value.trim();
+  if(!n){ toast('Enter your name first 🌸'); return; }
+  S.s('userName', n);
+  show('step-choice'); hide('step-name');
+}
+
+function createRoom() {
+  const c = mkCode(), u = uid();
+  S.s('userId',u); S.s('room',c);
+  document.getElementById('show-code').textContent = c;
+  show('step-wait'); hide('step-choice');
+
+  mq.subscribe(jtopic(c), {qos:1});
+  mq.on('message',(t,buf) => {
+    if(t !== jtopic(c)) return;
+    let d; try { d=JSON.parse(buf.toString()); } catch(e){ return; }
+    if(d.type==='join' && d.userId!==u) {
+      S.s('partnerName', d.name);
+      enterApp();
+    }
+  });
+}
+
+function joinRoom() {
+  const c = document.getElementById('inp-code').value.trim().toUpperCase();
+  if(c.length!==4){ toast('Enter the 4-letter code'); return; }
+  const u = uid();
+  S.s('userId',u); S.s('room',c);
+  mq.publish(jtopic(c), JSON.stringify({type:'join',userId:u,name:S.g('userName'),ts:Date.now()}), {qos:1});
+  enterApp();
+}
+
+function shareCode() {
+  const c = S.g('room');
+  const url = location.href.split('?')[0];
+  const msg = `Join me on pulse 💌\nOur code: ${c}\n${url}`;
+  if(navigator.share) navigator.share({title:'pulse', text:msg});
+  else { navigator.clipboard?.writeText(msg); toast('Copied! 📋'); }
+}
+
+// ═══════════════════════════════════════
+//  ENTER APP
+// ═══════════════════════════════════════
+function enterApp() {
+  const pn = S.g('partnerName') || 'my person';
+  document.getElementById('to-lbl').textContent = `to ${pn}`;
+  document.getElementById('pname-d').textContent = `${S.g('userName')} & ${pn}`;
+  document.getElementById('proom-d').textContent = `Room: ${S.g('room')}`;
+
+  subRoom();
+  goScreen('send');
+  updateEmUI();
+  buildVG();
+
+  // Ask for notification permission after 2 seconds
+  setTimeout(askNotif, 2000);
+
+  // iOS install hint
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if(isIOS && !navigator.standalone)
+    setTimeout(()=>document.getElementById('iosbanner').classList.add('show'), 4000);
+}
+
+// ═══════════════════════════════════════
+//  SUBSCRIBE — listen for partner messages
+// ═══════════════════════════════════════
+function subRoom() {
+  const room = S.g('room'), myId = S.g('userId');
+  const since = Date.now() - 4000;
+  mq.subscribe(topic(room), {qos:1});
+  mq.on('message',(t,buf) => {
+    if(t !== topic(room)) return;
+    let d; try { d=JSON.parse(buf.toString()); } catch(e){ return; }
+    if(d.from===myId || d.ts<since) return;
+    const em = EM.find(e=>e.key===d.emotion)||EM[0];
+    moments.unshift({em, msg:d.msg, from:d.fromName||'them', ts:d.ts, mine:false});
+    renderHistory();
+    showRcv(em, d.msg, d.fromName);
+  });
+}
+
+// ═══════════════════════════════════════
+//  SEND
+// ═══════════════════════════════════════
+async function sendMoment() {
+  const e = EM[eIdx];
+  const custom = document.getElementById('cmsg').value.trim();
+  const msg = custom || selMsg || e.msgs[0];
+
+  const btn = document.getElementById('hbtn');
+  btn.classList.add('go');
+  document.getElementById('taphint').textContent = 'sending…';
+  fireRipple(); spawnPtcls(e);
+  if(sett.vibe && navigator.vibrate) navigator.vibrate(e.vibe);
+
+  try {
+    await pub(S.g('room'), {
+      emotion: e.key, msg,
+      from: S.g('userId'),
+      fromName: S.g('userName'),
+      ts: Date.now()
+    });
+    moments.unshift({em:e, msg, from:'me', ts:Date.now(), mine:true});
+    renderHistory();
+    toast(`${e.sym}  Sent to ${S.g('partnerName')||'your person'}`);
+    document.getElementById('cmsg').value = '';
+    selMsg = null;
+    buildMsgOpts(e);
+  } catch(err) {
+    toast('Not connected — check signal');
+    console.error(err);
+  } finally {
+    setTimeout(()=>{
+      btn.classList.remove('go');
+      document.getElementById('taphint').textContent = 'tap to send';
+    }, 900);
+  }
+}
+
+// ═══════════════════════════════════════
+//  NOTIFICATIONS
+// ═══════════════════════════════════════
+async function askNotif() {
+  if(!('Notification' in window)) return;
+  if(Notification.permission === 'granted') return;
+  const p = await Notification.requestPermission();
+  if(p === 'granted') toast('Notifications enabled 🔔');
+}
+
+function localNotif(em, msg, fromName) {
+  if(Notification.permission !== 'granted') return;
+  if(document.visibilityState === 'visible') return;
+  try {
+    new Notification(`${fromName||'My person'} — ${em.name} ${em.sym}`, {
+      body: `"${msg}"`,
+      tag: 'pulse',
+      renotify: true,
+      silent: false
+    });
+  } catch(e){}
+}
+
+// ═══════════════════════════════════════
+//  RECEIVE
+// ═══════════════════════════════════════
+function showRcv(em, msg, fromName) {
+  const ov = document.getElementById('rcover');
+  ov.style.background = em.grad;
+  ov.style.setProperty('--ac', em.ac);
+
+  document.getElementById('rfrom').textContent = `from ${fromName||'my person'}`;
+  document.getElementById('rfrom').style.color = em.ac;
+  document.getElementById('resym').textContent = em.sym;
+  document.getElementById('resym').style.color = em.ac;
+  document.getElementById('rename').textContent = em.name;
+  document.getElementById('rename').style.color = em.ac;
+  document.getElementById('remsg').textContent = `"${msg}"`;
+
+  const rb = document.getElementById('rbtn');
+  rb.style.background = `linear-gradient(135deg,${em.ac},${em.ac}99)`;
+  rb.style.boxShadow = `0 12px 36px ${em.ac}44`;
+  rb.textContent = `Send love back ${em.sym}`;
+
+  if(sett.anim) document.getElementById('rpw').className = em.anim;
+  if(sett.vibe && navigator.vibrate) navigator.vibrate(em.vibe);
+  localNotif(em, msg, fromName);
+  ov.classList.add('show');
+}
+function closeRcv(){ document.getElementById('rcover').classList.remove('show'); }
+function replyBack(){ closeRcv(); goTo('send'); }
+
+// ═══════════════════════════════════════
+//  EMOTION UI
+// ═══════════════════════════════════════
+function switchE(d){ eIdx=(eIdx+d+EM.length)%EM.length; selMsg=null; updateEmUI(); }
+
+function updateEmUI() {
+  const e = EM[eIdx];
+  document.documentElement.style.setProperty('--ac', e.ac);
+  document.documentElement.style.setProperty('--chip', e.chip);
+  document.documentElement.style.setProperty('--grad', e.grad);
+  document.getElementById('screen-send').style.background = e.grad;
+
+  document.getElementById('esym').textContent = e.sym;
+  document.getElementById('esym').style.color = e.ac;
+  document.getElementById('ename').textContent = e.name;
+  document.getElementById('ename').style.color = e.ac;
+
+  const hb = document.getElementById('hbtn');
+  hb.textContent = e.sym;
+  hb.style.color = e.ac;
+  hb.style.borderColor = e.chip;
+  hb.style.boxShadow = `0 16px 60px ${e.ac}22`;
+
+  document.getElementById('nsend').style.color = e.ac;
+  document.getElementById('nlsend').style.color = e.ac;
+  document.getElementById('to-lbl').style.color = e.ac;
+  document.getElementById('rring').style.borderColor = e.ac;
+  document.getElementById('pw').className = e.anim;
+  buildMsgOpts(e);
+}
+
+function buildMsgOpts(e) {
+  document.getElementById('mopts').innerHTML = e.msgs.map(m =>
+    `<button class="mchip${selMsg===m?' on':''}" onclick="pickMsg('${m.replace(/'/g,"\\'")}')">
+      ${m}
+    </button>`
+  ).join('');
+}
+function pickMsg(m){
+  selMsg = selMsg===m ? null : m;
+  document.getElementById('cmsg').value = '';
+  buildMsgOpts(EM[eIdx]);
+}
+
+// ═══════════════════════════════════════
+//  ANIMATIONS
+// ═══════════════════════════════════════
+function fireRipple(){
+  const r = document.getElementById('rring');
+  r.classList.remove('fire'); void r.offsetWidth; r.classList.add('fire');
+}
+function spawnPtcls(e){
+  const c = document.getElementById('ptcls'); c.innerHTML='';
+  for(let i=0;i<8;i++){
+    const p = document.createElement('div');
+    p.className='ptcl';
+    p.textContent=e.sym; p.style.color=e.ac;
+    p.style.left=(18+Math.random()*64)+'%';
+    p.style.bottom='42%';
+    p.style.animationDelay=(i*.09)+'s';
+    c.appendChild(p);
+  }
+  setTimeout(()=>c.innerHTML='',1400);
+}
+
+// ═══════════════════════════════════════
+//  HISTORY
+// ═══════════════════════════════════════
+function renderHistory(){
+  const l = document.getElementById('hlist');
+  if(!moments.length){
+    l.innerHTML = '<div class="empty">No moments yet.<br>Send your first feeling.</div>';
+    return;
+  }
+  l.innerHTML = moments.slice(0,40).map((m,i)=>`
+    <div class="mcard" style="animation-delay:${i*.05}s">
+      <div class="mico" style="background:${m.em.ac}16;color:${m.em.ac}">${m.em.sym}</div>
+      <div class="mbody">
+        <div class="mname" style="color:${m.em.ac}">${m.em.name}</div>
+        <div class="mmsg">"${m.msg}"</div>
+        <div class="mfrom">${m.mine?'You sent':`${m.from} sent`}</div>
+      </div>
+      <div class="mtime">${fmtT(m.ts)}</div>
+    </div>`).join('');
+}
+
+function fmtT(ts){
+  if(!ts) return '';
+  const d=new Date(ts),now=new Date(),diff=now-d;
+  if(diff<60000) return 'Just now';
+  if(diff<3600000) return Math.floor(diff/60000)+'m ago';
+  if(diff<86400000) return d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  if(diff<172800000) return 'Yesterday';
+  return d.toLocaleDateString([],{month:'short',day:'numeric'});
+}
+
+// ═══════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════
+function buildVG(){
+  const g = document.getElementById('vgrid'); if(!g) return;
+  g.innerHTML = EM.map(e=>`
+    <div class="vchip" id="vc-${e.key}" onclick="prevVibe('${e.key}')">
+      <span class="vsym" style="color:${e.ac}">${e.sym}</span>
+      <div class="vcname" style="color:${e.ac}">${e.name}</div>
+      <div class="vpat">${e.vpat}</div>
+    </div>`).join('');
+}
+function prevVibe(k){
+  document.querySelectorAll('.vchip').forEach(c=>c.classList.remove('on'));
+  const chip = document.getElementById('vc-'+k);
+  if(chip) chip.classList.add('on');
+  const e = EM.find(x=>x.key===k); if(!e) return;
+  if(navigator.vibrate) navigator.vibrate(e.vibe);
+  const d = document.getElementById('vdesc');
+  d.style.display='block'; d.style.color=e.ac; d.textContent=e.vdesc;
+}
+function togS(k, btn){
+  sett[k] = !sett[k];
+  btn.style.background = sett[k] ? '#C0405E' : 'rgba(255,255,255,.08)';
+  btn.querySelector('.tth').style.left = sett[k] ? '25px' : '3px';
+}
+function disconnect(){
+  if(!confirm('Disconnect and reset? Cannot be undone.')) return;
+  ['userId','room','userName','partnerName'].forEach(k=>S.d(k));
+  location.reload();
+}
+
+// ═══════════════════════════════════════
+//  ROUTING
+// ═══════════════════════════════════════
+function goTo(n){ goScreen(n); }
+function goScreen(n){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+n)?.classList.add('active');
+}
+function show(id){ const e=document.getElementById(id); if(e) e.style.display='block'; }
+function hide(id){ const e=document.getElementById(id); if(e) e.style.display='none'; }
+
+// ═══════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════
+let _tt;
+function toast(m){
+  const t=document.getElementById('toast');
+  t.textContent=m; t.classList.add('show');
+  clearTimeout(_tt);
+  _tt=setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// ═══════════════════════════════════════
+//  BOOT
+// ═══════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  connectMQTT(() => {
+    document.getElementById('loading').style.display = 'none';
+    if(S.g('room') && S.g('userId') && S.g('userName')) enterApp();
+    else goScreen('setup');
+  });
+
+  // Fallback — show UI after 6s even if MQTT is slow
+  setTimeout(() => {
+    const l = document.getElementById('loading');
+    if(l && l.style.display !== 'none') {
+      l.style.display = 'none';
+      if(S.g('room') && S.g('userId') && S.g('userName')) enterApp();
+      else goScreen('setup');
+    }
+  }, 6000);
+
+  // Handle notification click (opened from background)
+  navigator.serviceWorker?.addEventListener('message', e => {
+    if(e.data?.type==='RECV'){
+      const em = EM.find(x=>x.key===e.data.emotion)||EM[0];
+      showRcv(em, e.data.msg, e.data.from);
+    }
+  });
+});
+</script>
+</body>
+</html>
