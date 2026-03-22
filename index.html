@@ -294,7 +294,7 @@ body{font-family:var(--hand);display:flex;justify-content:center;overscroll-beha
 
 <!-- RELATION -->
 <div id="screen-relation" class="screen" style="position:relative">
-  <button class="top-back" id="back-relation" onclick="goScreen('onboard')" style="position:absolute">← <span id="back-relation-txt">Back</span></button>
+  <button class="top-back" id="back-relation" onclick="goBack()" style="position:absolute">← <span id="back-relation-txt">Back</span></button>
   <div style="text-align:center"><span class="rel-logo" onclick="logoTap()" style="cursor:pointer">pulse</span><div class="rel-sub" id="rel-sub-lbl">a private emotional shortcut</div></div>
   <div><div class="rel-q" id="rel-q-txt">What's your connection?</div><div class="rel-sub2" id="rel-sub2-txt">pulse will tailor everything for you</div></div>
   <div class="rel-options">
@@ -306,7 +306,7 @@ body{font-family:var(--hand);display:flex;justify-content:center;overscroll-beha
 
 <!-- ONBOARD -->
 <div id="screen-onboard" class="screen" style="position:relative">
-  <button class="top-back" id="back-onboard" onclick="goScreen('lang')">← <span id="back-onboard-txt">Back</span></button>
+  <button class="top-back" id="back-onboard" onclick="goBack()">← <span id="back-onboard-txt">Back</span></button>
   <!-- logo -->
   <div style="text-align:center;padding:0 28px">
     <span class="ob-logo" onclick="logoTap()" style="cursor:pointer">pulse</span>
@@ -330,7 +330,7 @@ body{font-family:var(--hand);display:flex;justify-content:center;overscroll-beha
 
 <!-- SETUP -->
 <div id="screen-setup" class="screen" style="position:relative">
-  <button class="top-back" id="back-setup" onclick="setupBack()">← <span id="back-setup-txt">Back</span></button>
+  <button class="top-back" id="back-setup" onclick="goBack()">← <span id="back-setup-txt">Back</span></button>
   <div style="text-align:center"><span class="ob-logo" style="font-size:52px;letter-spacing:6px">pulse</span><div class="ob-logo-sub" id="setup-sub">a private emotional shortcut</div></div>
   <div class="glass" id="step-name">
     <h2 id="setup-name-h">What's your name?</h2>
@@ -341,7 +341,7 @@ body{font-family:var(--hand);display:flex;justify-content:center;overscroll-beha
     <h2 id="setup-conn-h">Your connection</h2>
     <button class="btn-cta" id="btn-create" onclick="createRoom()" style="margin-bottom:0">Create our connection</button>
     <div class="div-sep">— or —</div>
-    <input class="field field-code" id="inp-code" placeholder="CODE" maxlength="4" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+    <input class="field field-code" id="inp-code" placeholder="CODE" maxlength="6" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
     <button class="btn-cta" id="btn-join" onclick="joinRoom()">Join with code</button>
   </div>
   <div class="glass" id="step-wait" style="display:none">
@@ -355,7 +355,7 @@ body{font-family:var(--hand);display:flex;justify-content:center;overscroll-beha
 
 <!-- WAITING ROOM -->
 <div id="screen-waiting" class="screen" style="position:relative">
-  <button class="top-back" id="back-waiting" onclick="goScreen('setup');showStep('step-choice')">← <span id="back-waiting-txt">Back</span></button>
+  <button class="top-back" id="back-waiting" onclick="goBack()">← <span id="back-waiting-txt">Back</span></button>
   <div class="wait-room">
     <div id="waiting-puppy" style="margin-bottom:28px"><div class="anim-float" style="display:inline-block">
       <svg width="110" height="124" viewBox="0 0 100 113" fill="none">
@@ -530,7 +530,7 @@ body{font-family:var(--hand);display:flex;justify-content:center;overscroll-beha
 <!-- LOVE TREE (romantic only) -->
 <div id="screen-tree" class="screen">
   <div class="hhead" style="display:flex;align-items:center;gap:12px">
-    <button class="back-btn" onclick="goTo('send')" id="back-tree">←</button>
+    <button class="back-btn" onclick="goBack()" id="back-tree">←</button>
     <div><h1 id="tree-title" style="font-family:var(--serif);font-size:38px;font-weight:300;color:#3A5A20;line-height:1">Our Tree</h1><p id="tree-hint" style="font-size:12px;color:rgba(58,90,32,.5);margin-top:3px">Grows when you're together</p></div>
   </div>
   <div class="tree-wrap">
@@ -563,7 +563,7 @@ body{font-family:var(--hand);display:flex;justify-content:center;overscroll-beha
 <!-- EMO EDITOR -->
 <div id="screen-emo-edit" class="screen">
   <div class="hhead" style="display:flex;align-items:center;gap:12px">
-    <button class="back-btn" onclick="goTo('settings')" id="back-emo-edit">←</button>
+    <button class="back-btn" onclick="goBack()" id="back-emo-edit">←</button>
     <div><h1 id="emo-edit-title" style="font-family:var(--serif);font-size:38px;font-weight:300;color:#3A2010;line-height:1">My Emotions</h1><p id="emo-edit-hint" style="font-size:12px;color:var(--txt2);margin-top:3px">Tap to edit · Hold to delete</p></div>
   </div>
   <div class="eeditor-list" id="eeditor-list"></div>
@@ -921,7 +921,7 @@ let obStep=0;
 
 const S={g:k=>localStorage.getItem('px_'+k),s:(k,v)=>localStorage.setItem('px_'+k,v),d:k=>localStorage.removeItem('px_'+k)};
 const uid=()=>Math.random().toString(36).slice(2,12);
-const mkCode=()=>{const a='ABCDEFGHJKLMNPQRSTUVWXYZ';return Array.from({length:4},()=>a[Math.floor(Math.random()*a.length)]).join('')};
+const mkCode=()=>{const a='ABCDEFGHJKLMNPQRSTUVWXYZ';return Array.from({length:6},()=>a[Math.floor(Math.random()*a.length)]).join('')};
 const topic=r=>'pulse/v6/'+r, jtopic=r=>'pulse/v6/'+r+'/join', htopic=r=>'pulse/v6/'+r+'/hist';
 const T=()=>LANGS[curLang]||LANGS.en;
 
@@ -1243,7 +1243,7 @@ function createRoom(){
 }
 function joinRoom(){
   const c=document.getElementById('inp-code').value.trim().toUpperCase();
-  if(c.length!==4){toast(T().enterCode);return}
+  if(c.length<4||c.length>6){toast(T().enterCode);return}
   const u=uid();S.s('userId',u);S.s('room',c);
   addConnFromSetup(c,u,S.g('userName'),S.g('relation')||'romantic');
   mq.publish(jtopic(c),JSON.stringify({type:'join',userId:u,name:S.g('userName'),ts:Date.now()}),{qos:1});
@@ -1277,10 +1277,16 @@ function connectMQTT(cb){
   tryB();
 }
 function setConn(ok){const d=document.getElementById('sdot'),t=document.getElementById('ctxt');if(!d||!t)return;d.style.background=ok?'#60A850':'#C0B0A0';t.textContent=ok?'connected':'offline'}
+var _lastPubTime=0;
 function pub(room,payload){
   return new Promise((res,rej)=>{
     if(!mq||!mqOk){rej(new Error('offline'));return}
-    const str=JSON.stringify(payload);
+    // Rate limit: 500ms between messages (except tree/location)
+    var now=Date.now();
+    if(payload.type!=='treeLocation'&&now-_lastPubTime<500){rej(new Error('rate'));return}
+    _lastPubTime=now;
+    var str=JSON.stringify(payload);
+    if(str.length>10000){rej(new Error('too large'));return}
     mq.publish(topic(room),str,{qos:1},err=>{
       if(!err){res();return}
       setTimeout(()=>{if(mq&&mqOk)mq.publish(topic(room),str,{qos:1},e2=>e2?rej(e2):res());else rej(err)},1500);
@@ -1308,13 +1314,19 @@ function enterApp(){
 }
 
 // ═══ SUBSCRIBE ════════════════════════════════════════════════
+var _subRoomActive=false;
 function subRoom(){
   const room=S.g('room'),myId=S.g('userId'),since=Date.now()-4000;
+  if(!room||!mq)return;
   mq.subscribe(topic(room),{qos:1});
   mq.subscribe(htopic(room),{qos:1});
+  // Prevent duplicate listeners
+  if(_subRoomActive)return;
+  _subRoomActive=true;
   mq.on('message',(t,buf)=>{
-    if(t===htopic(room)){
-      // Received retained history — merge with local
+    var curRoom=S.g('room'),curId=S.g('userId');
+    if(!curRoom)return;
+    if(t===htopic(curRoom)){
       try{
         const remote=JSON.parse(buf.toString());
         if(Array.isArray(remote)&&remote.length>moments.length){
@@ -1323,22 +1335,25 @@ function subRoom(){
       }catch(e){}
       return;
     }
-    if(t!==topic(room))return;
+    if(t!==topic(curRoom))return;
     let d;try{d=JSON.parse(buf.toString())}catch(e){return}
-    if(d.type==='animalUpdate'&&d.from!==myId){if(d.key)S.s('animalKey',d.key);if(d.name)S.s('animalName',d.name);updateAnimalUI();return}
-    if(d.type==='sound'&&d.from!==myId){receiveSoundNotif(d.soundKey,d.fromName||'');return}
+    if(!d||typeof d!=='object')return;
+    if(d.type==='animalUpdate'&&d.from!==curId){if(d.key)S.s('animalKey',d.key);if(d.name)S.s('animalName',d.name);updateAnimalUI();return}
+    if(d.type==='sound'&&d.from!==curId){receiveSoundNotif(d.soundKey,d.fromName||'');return}
     if(d.type==='treeLocation'||d.type==='treeUpdate'){handleTreeMessage(d);return}
-    if(d.from===myId||d.ts<since)return;
+    if(d.from===curId||d.ts<since)return;
     const em=curEMs.find(e=>e.key===d.emotion)||curEMs[0];
-    moments.unshift({em:{key:em.key,name:em.name,sym:em.sym,ac:em.ac,chip:em.chip,grad:em.grad,anim:em.anim},msg:d.msg,from:d.fromName||'them',ts:d.ts,mine:false});
+    var safeMsg=sanitize(d.msg),safeName=sanitize(d.fromName)||'them';
+    moments.unshift({em:{key:em.key,name:em.name,sym:em.sym,ac:em.ac,chip:em.chip,grad:em.grad,anim:em.anim},msg:safeMsg,from:safeName,ts:d.ts,mine:false});
     saveMoments();publishHistory();renderHistory();
-    showRcv(em,d.msg,d.fromName);
+    showRcv(em,safeMsg,safeName);
   });
 }
 
 // ═══ SEND ═════════════════════════════════════════════════════
+function sanitize(s){if(!s)return'';return String(s).replace(/[<>"'&]/g,function(c){return{'<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','&':'&amp;'}[c]||c}).slice(0,500)}
 async function sendMoment(){
-  const e=curEMs[eIdx],custom=document.getElementById('cmsg').value.trim(),msg=custom||selMsg||e.msgs[0];
+  const e=curEMs[eIdx],custom=sanitize(document.getElementById('cmsg').value.trim()),msg=custom||selMsg||e.msgs[0];
   const btn=document.getElementById('hbtn');
   btn.classList.add('go');document.getElementById('taphint').textContent=T().sending;
   fireRipple();spawnPtcls(e);
@@ -1611,7 +1626,20 @@ function goTo(n){
   if(n==='settings'){buildVG();renderConns();}
   if(n==='tree')renderTree();
 }
-function goScreen(n){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById('screen-'+n)?.classList.add('active')}
+var _screenHistory=[];
+function goScreen(n){
+  // Track history for back navigation
+  var cur=document.querySelector('.screen.active');
+  if(cur){var curId=cur.id.replace('screen-','');if(curId!==n)_screenHistory.push(curId)}
+  if(_screenHistory.length>20)_screenHistory=_screenHistory.slice(-10);
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+n)?.classList.add('active');
+}
+function goBack(){
+  // Go to previous screen in history
+  var prev=_screenHistory.pop();
+  if(prev){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById('screen-'+prev)?.classList.add('active')}
+}
 function show(id){const e=document.getElementById(id);if(e)e.style.display='block'}
 function hide(id){const e=document.getElementById(id);if(e)e.style.display='none'}
 let _tt;
@@ -2197,6 +2225,37 @@ window.addEventListener('DOMContentLoaded',()=>{
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
+
+// ═══ BROWSER BACK BUTTON SUPPORT ═══════════════════════════════
+// Push state on each screen change so browser back works
+(function(){
+  var _origGoScreen=window.goScreen;
+  // Replaced in main script, so override after load
+  window.addEventListener('load',function(){
+    var origGo=window.goScreen;
+    // On popstate (browser back), go to previous screen
+    window.addEventListener('popstate',function(e){
+      if(e.state&&e.state.screen){
+        document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});
+        var el=document.getElementById('screen-'+e.state.screen);
+        if(el)el.classList.add('active');
+      } else {
+        goBack();
+      }
+    });
+    // Push state when screen changes
+    var _lastPushedScreen='';
+    var origGoScreen=window.goScreen;
+    var _wrapGoScreen=function(n){
+      origGoScreen(n);
+      if(n!==_lastPushedScreen){
+        history.pushState({screen:n},'','');
+        _lastPushedScreen=n;
+      }
+    };
+    window.goScreen=_wrapGoScreen;
+  });
+})();
 
 // ═══ QUICK SEND FROM SHORTCUT ═══════════════════════════════════
 // When opened via ?quick=miss (from home screen shortcut),
