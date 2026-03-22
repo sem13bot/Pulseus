@@ -1,9 +1,8 @@
-const CACHE_NAME = 'pulse-v20';
+const CACHE_NAME = 'pulse-v21';
 const ASSETS = [
   './',
   './index.html',
-  './manifest.json',
-  'https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Varela+Round&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap'
+  './manifest.json'
 ];
 
 self.addEventListener('install', e => {
@@ -42,15 +41,20 @@ self.addEventListener('fetch', e => {
   );
 });
 
-// Handle notification clicks
+// Handle notification clicks — open or focus the app
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   e.waitUntil(
-    self.clients.matchAll({ type: 'window' }).then(clients => {
-      if (clients.length > 0) {
-        return clients[0].focus();
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+      // Focus existing window if found
+      for (const client of clients) {
+        if (client.url.includes('index.html') || client.url.endsWith('/')) {
+          return client.focus();
+        }
       }
-      return self.clients.openWindow('./index.html');
+      // Otherwise open new window
+      const url = (e.notification.data && e.notification.data.url) || './index.html';
+      return self.clients.openWindow(url);
     })
   );
 });
