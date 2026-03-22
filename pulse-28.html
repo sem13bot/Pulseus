@@ -1,0 +1,1830 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>pulse</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="pulse">
+<meta name="theme-color" content="#E8D4B4">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Varela+Round&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+<style>
+/* ════════════════════════════════════════════════
+   TOKENS
+════════════════════════════════════════════════ */
+:root {
+  --bg:     #F5E6CF;
+  --bg2:    linear-gradient(160deg,#F8EAD8 0%,#EDD8B8 55%,#D9C09A 100%);
+  --txt:    #3A2010;
+  --txt2:   rgba(58,32,16,.52);
+  --ac:     #8B5E3C;
+  --chip:   rgba(139,94,60,.35);
+  --hand:   'Caveat','Varela Round',cursive;
+  --sans:   'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+  --st:     env(safe-area-inset-top,44px);
+  --sb:     env(safe-area-inset-bottom,20px);
+  --radius: 20px;
+  --card:   rgba(255,255,255,.55);
+  --border: rgba(139,94,60,.13);
+}
+/* ════════════════════════════════════════════════
+   RESET
+════════════════════════════════════════════════ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg)}
+body{font-family:var(--sans);display:flex;justify-content:center;overscroll-behavior:none}
+
+/* ════════════════════════════════════════════════
+   APP SHELL
+════════════════════════════════════════════════ */
+#app{
+  width:100%;max-width:430px;
+  height:100dvh;height:100vh;
+  position:relative;overflow:hidden;
+  background:var(--bg2);
+}
+.screen{
+  position:absolute;inset:0;
+  display:none;flex-direction:column;
+  background:var(--bg2);
+  overflow:hidden;
+}
+.screen.active{display:flex}
+
+/* ════════════════════════════════════════════════
+   KEYFRAMES
+════════════════════════════════════════════════ */
+@keyframes float   {0%,100%{transform:translateY(0)}    50%{transform:translateY(-12px)}}
+@keyframes tilt    {0%,100%{transform:rotate(0)}        35%{transform:rotate(-13deg) translateY(-5px)} 70%{transform:rotate(10deg) translateY(-2px)}}
+@keyframes breathe {0%,100%{transform:scale(1)}         50%{transform:scale(1.07)}}
+@keyframes bounce  {0%,100%{transform:translateY(0)}    28%{transform:translateY(-18px)} 55%{transform:translateY(-6px)}}
+@keyframes beat    {0%,100%{transform:scale(1)}         50%{transform:scale(1.08)}}
+@keyframes wag     {0%,100%{transform:rotate(0)}        38%{transform:rotate(22deg)}     70%{transform:rotate(-18deg)}}
+@keyframes ripple  {from{transform:scale(1);opacity:.5} to{transform:scale(2.8);opacity:0}}
+@keyframes liftup  {0%{transform:translateY(0);opacity:.85} 100%{transform:translateY(-80px) scale(.15);opacity:0}}
+@keyframes spin    {to{transform:rotate(360deg)}}
+@keyframes glow    {0%,100%{box-shadow:0 0 0 0 var(--chip)} 50%{box-shadow:0 0 0 22px transparent}}
+@keyframes fadeIn  {from{opacity:0} to{opacity:1}}
+@keyframes slideUp {from{transform:translateY(22px);opacity:0} to{transform:translateY(0);opacity:1}}
+@keyframes slideIn {from{transform:translateY(100%)} to{transform:translateY(0)}}
+@keyframes blink   {0%,80%,100%{opacity:.18} 40%{opacity:1}}
+
+/* ════════════════════════════════════════════════
+   TYPOGRAPHY
+════════════════════════════════════════════════ */
+.hand{font-family:var(--hand)}
+.sans{font-family:var(--sans)}
+.logo{
+  font-family:var(--hand);
+  font-size:62px;font-weight:700;
+  letter-spacing:7px;color:#6B4020;
+  text-shadow:0 2px 28px rgba(139,94,60,.22);
+  text-align:center;line-height:1;
+  cursor:pointer;
+  display:block;
+}
+.logo-sub{
+  font-family:var(--sans);
+  font-size:9px;letter-spacing:4px;
+  text-transform:uppercase;
+  color:rgba(107,64,32,.42);
+  text-align:center;margin-top:7px;
+}
+.title{
+  font-family:var(--hand);
+  font-size:30px;font-weight:700;
+  color:var(--txt);line-height:1.2;
+  text-align:center;
+}
+.subtitle{
+  font-family:var(--sans);
+  font-size:13px;color:var(--txt2);
+  text-align:center;margin-top:6px;
+}
+
+/* ════════════════════════════════════════════════
+   COMPONENTS
+════════════════════════════════════════════════ */
+/* Card */
+.card{
+  background:var(--card);
+  border:1.5px solid var(--border);
+  border-radius:var(--radius);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  box-shadow:0 4px 20px rgba(139,94,60,.09);
+}
+
+/* Primary button */
+.btn{
+  width:100%;border:none;border-radius:50px;
+  padding:17px 0;
+  font-family:var(--hand);font-size:19px;font-weight:700;
+  color:white;cursor:pointer;
+  background:linear-gradient(135deg,var(--ac),#6B4020);
+  box-shadow:0 8px 24px rgba(139,94,60,.32);
+  transition:transform .18s,box-shadow .18s;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.btn:active{transform:scale(.97)}
+
+/* Ghost button */
+.btn-ghost{
+  background:transparent;
+  border:1.5px solid var(--border);
+  color:var(--txt2);
+  box-shadow:none;
+}
+.btn-ghost:active{background:rgba(139,94,60,.07)}
+
+/* Field */
+.field{
+  width:100%;
+  background:rgba(255,255,255,.68);
+  border:1.5px solid var(--border);
+  border-radius:14px;
+  padding:14px 18px;
+  font-family:var(--sans);font-size:15px;color:var(--txt);
+  outline:none;
+  transition:border-color .2s;
+  -webkit-appearance:none;
+}
+.field::placeholder{color:rgba(139,94,60,.32)}
+.field:focus{border-color:var(--ac)}
+.field-code{text-align:center;letter-spacing:11px;font-size:25px;text-transform:uppercase;font-family:var(--sans)}
+
+/* Back button */
+.back{
+  position:absolute;
+  top:calc(var(--st) + 12px);
+  inset-inline-start:16px;
+  background:rgba(255,255,255,.52);
+  border:1.5px solid var(--border);
+  border-radius:50px;
+  padding:8px 16px;
+  font-family:var(--hand);font-size:16px;font-weight:600;
+  color:var(--ac);cursor:pointer;
+  backdrop-filter:blur(8px);
+  z-index:10;
+  display:flex;align-items:center;gap:5px;
+}
+
+/* Toggle */
+.tog{width:48px;height:27px;border-radius:14px;border:none;cursor:pointer;position:relative;transition:background .3s;flex-shrink:0}
+.tog-thumb{width:21px;height:21px;border-radius:50%;background:white;position:absolute;top:3px;transition:inset-inline-start .3s;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+
+/* Separator */
+.sep{
+  text-align:center;
+  font-family:var(--sans);font-size:10px;
+  color:rgba(139,94,60,.28);letter-spacing:3px;
+  margin:12px 0;
+}
+
+/* Badge connected */
+.badge{
+  background:rgba(255,255,255,.48);
+  border:1px solid var(--border);
+  border-radius:50px;
+  padding:7px 16px;
+  font-family:var(--sans);font-size:10px;
+  color:var(--txt2);
+  display:flex;align-items:center;gap:6px;
+  cursor:pointer;
+}
+.dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;transition:background .4s}
+
+/* Toast */
+#toast{
+  position:fixed;
+  bottom:calc(var(--sb) + 88px);
+  left:50%;transform:translateX(-50%) translateY(12px);
+  background:rgba(48,24,8,.88);
+  color:rgba(248,224,196,.92);
+  border:none;border-radius:50px;
+  padding:11px 24px;
+  font-family:var(--hand);font-size:16px;
+  opacity:0;pointer-events:none;
+  transition:all .3s;z-index:500;
+  white-space:nowrap;
+  backdrop-filter:blur(12px);
+}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* Modal */
+.modal-bg{position:fixed;inset:0;background:rgba(48,24,8,.42);z-index:400;display:flex;align-items:flex-end;justify-content:center;animation:fadeIn .22s ease}
+.modal{
+  width:100%;max-width:430px;
+  background:var(--bg2);
+  border-radius:28px 28px 0 0;
+  padding:28px 24px calc(var(--sb) + 28px);
+  animation:slideIn .32s ease;
+}
+.modal h3{font-family:var(--hand);font-size:26px;font-weight:700;color:var(--txt);margin-bottom:20px}
+
+/* iOS banner */
+#ios-banner{
+  position:fixed;top:0;left:50%;transform:translateX(-50%);
+  width:100%;max-width:430px;
+  background:linear-gradient(135deg,var(--ac),#5A3018);
+  color:rgba(255,245,230,.9);
+  padding:calc(var(--st) + 12px) 20px 16px;
+  font-family:var(--sans);font-size:13px;line-height:1.65;
+  z-index:300;box-shadow:0 4px 24px rgba(0,0,0,.2);
+  display:none;
+}
+#ios-banner.show{display:block}
+#ios-banner strong{font-family:var(--hand);font-size:16px;display:block;margin-bottom:4px}
+#ios-banner .x{position:absolute;top:calc(var(--st)+12px);inset-inline-end:16px;background:none;border:none;color:rgba(255,245,230,.45);font-size:22px;cursor:pointer}
+
+/* Nav */
+.nav{
+  display:flex;justify-content:space-around;align-items:center;
+  padding:8px 0 calc(var(--sb) + 8px);
+  background:rgba(248,234,216,.94);
+  border-top:1px solid var(--border);
+  backdrop-filter:blur(20px);
+  flex-shrink:0;
+}
+.nav-btn{background:none;border:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 24px}
+.nav-icon{font-size:21px;line-height:1;transition:color .25s}
+.nav-label{font-family:var(--hand);font-size:11px;transition:color .25s}
+
+/* Puppy animations */
+.anim-float  {animation:float   3.4s ease-in-out infinite;display:inline-block}
+.anim-tilt   {animation:tilt    2.9s ease-in-out infinite;display:inline-block}
+.anim-breathe{animation:breathe 3.8s ease-in-out infinite;display:inline-block}
+.anim-bounce {animation:bounce  .95s ease-in-out infinite;display:inline-block}
+
+/* ════════════════════════════════════════════════
+   SCREEN: LANG
+════════════════════════════════════════════════ */
+#s-lang{align-items:center;justify-content:space-between;padding:calc(var(--st)+52px) 28px calc(var(--sb)+52px)}
+.lang-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%;max-width:320px}
+.lang-btn{
+  background:var(--card);border:1.5px solid var(--border);
+  border-radius:var(--radius);padding:20px 12px;
+  cursor:pointer;text-align:center;
+  backdrop-filter:blur(8px);
+  box-shadow:0 4px 18px rgba(139,94,60,.09);
+  transition:all .22s;
+}
+.lang-btn:active{transform:scale(.97)}
+.lang-flag{font-size:30px;display:block;margin-bottom:6px}
+.lang-name{font-family:var(--hand);font-size:17px;font-weight:700;color:var(--txt);display:block}
+
+/* ════════════════════════════════════════════════
+   SCREEN: ONBOARD
+════════════════════════════════════════════════ */
+#s-onboard{
+  padding:calc(var(--st)+48px) 28px calc(var(--sb)+24px);
+  align-items:center;justify-content:space-between;
+}
+.ob-puppy{display:flex;justify-content:center;padding:4px 0}
+.ob-bullets{display:flex;flex-direction:column;gap:10px;width:100%}
+.ob-bullet{
+  display:flex;align-items:flex-start;gap:13px;
+  background:rgba(255,255,255,.5);
+  border:1px solid var(--border);
+  border-radius:16px;padding:12px 16px;
+  animation:slideUp .4s ease both;
+}
+.ob-bullet-icon{font-size:22px;flex-shrink:0;margin-top:1px}
+.ob-bullet-title{font-family:var(--hand);font-size:16px;font-weight:700;color:var(--txt);margin-bottom:2px}
+.ob-bullet-sub{font-family:var(--sans);font-size:11px;color:var(--txt2);line-height:1.5}
+
+/* ════════════════════════════════════════════════
+   SCREEN: NAME / SETUP
+════════════════════════════════════════════════ */
+#s-name,#s-setup{
+  align-items:center;justify-content:space-between;
+  padding:calc(var(--st)+48px) 28px calc(var(--sb)+48px);
+}
+.setup-card{width:100%;max-width:340px}
+
+/* ════════════════════════════════════════════════
+   SCREEN: RELATION
+════════════════════════════════════════════════ */
+#s-relation{
+  align-items:center;justify-content:space-between;
+  padding:calc(var(--st)+60px) 28px calc(var(--sb)+52px);
+}
+.rel-options{display:flex;flex-direction:column;gap:11px;width:100%;max-width:320px}
+.rel-btn{
+  background:var(--card);border:1.5px solid var(--border);
+  border-radius:var(--radius);
+  padding:18px 22px;cursor:pointer;
+  display:flex;align-items:center;gap:16px;
+  text-align:start;
+  transition:all .22s;
+  box-shadow:0 4px 16px rgba(139,94,60,.09);
+}
+.rel-btn:active{transform:scale(.98)}
+.rel-icon{font-size:28px;flex-shrink:0}
+.rel-title{font-family:var(--hand);font-size:21px;font-weight:700;margin-bottom:2px}
+.rel-sub{font-family:var(--sans);font-size:12px;color:var(--txt2)}
+
+/* ════════════════════════════════════════════════
+   SCREEN: WAITING
+════════════════════════════════════════════════ */
+#s-wait{align-items:center;justify-content:center;padding:40px 32px}
+.wait-code{
+  background:rgba(255,255,255,.6);
+  border:1.5px solid rgba(139,94,60,.18);
+  border-radius:24px;padding:20px 36px;
+  text-align:center;margin-bottom:22px;
+}
+.wait-code-label{font-family:var(--sans);font-size:9px;color:rgba(139,94,60,.42);letter-spacing:3px;text-transform:uppercase;display:block;margin-bottom:8px}
+.wait-code-text{font-family:var(--hand);font-size:50px;font-weight:700;letter-spacing:13px;line-height:1;display:block}
+.wait-dots{display:flex;gap:8px;margin:20px 0}
+.wait-dot{width:8px;height:8px;border-radius:50%;opacity:.2}
+
+/* ════════════════════════════════════════════════
+   SCREEN: SEND
+════════════════════════════════════════════════ */
+#s-send{transition:background .45s ease}
+.topbar{padding:calc(var(--st)+14px) 20px 0;display:flex;justify-content:space-between;align-items:center}
+.to-label{font-family:var(--hand);font-size:14px;letter-spacing:4px;text-transform:uppercase;opacity:.55;color:var(--ac)}
+.puppy-wrap{display:flex;justify-content:center;padding:6px 0 2px;flex-shrink:0}
+.emo-row{display:flex;align-items:center;justify-content:center;gap:20px;padding:2px 0}
+.arr{background:none;border:none;font-size:30px;color:rgba(139,94,60,.22);cursor:pointer;padding:8px 12px;line-height:1;transition:color .2s}
+.arr:active{color:rgba(139,94,60,.6)}
+.emo-center{text-align:center;min-width:158px}
+.emo-sym{font-size:38px;display:block;line-height:1;transition:color .35s}
+.emo-name{font-family:var(--hand);font-size:24px;font-weight:700;margin-top:3px;transition:color .35s}
+.heart-wrap{display:flex;flex-direction:column;align-items:center;padding:8px 0 4px;position:relative;flex-shrink:0}
+.ripple{position:absolute;width:118px;height:118px;border-radius:50%;border:2px solid var(--ac);pointer-events:none;opacity:0}
+.ripple.fire{animation:ripple .8s ease-out forwards}
+.particles{position:absolute;pointer-events:none;inset:0;overflow:hidden}
+.particle{position:absolute;font-size:15px;animation:liftup 1s ease-out forwards;opacity:0}
+#send-btn{
+  width:118px;height:118px;border-radius:50%;
+  background:rgba(255,255,255,.62);
+  border:2px solid var(--chip);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:52px;line-height:1;
+  color:var(--ac);
+  transition:transform .25s;
+  animation:beat 4s ease-in-out infinite;
+  position:relative;z-index:1;
+  -webkit-appearance:none;
+  box-shadow:0 10px 40px rgba(139,94,60,.18);
+}
+#send-btn.sending{animation:glow .6s ease-in-out infinite;transform:scale(.92)}
+#send-btn:active{transform:scale(.88)}
+.tap-hint{font-family:var(--sans);font-size:9px;letter-spacing:3px;text-transform:uppercase;color:rgba(139,94,60,.32);margin-top:9px}
+.sound-btn{
+  margin-top:7px;
+  background:rgba(255,255,255,.5);border:1.5px solid var(--border);
+  border-radius:50px;padding:6px 18px;
+  font-size:16px;cursor:pointer;
+  backdrop-filter:blur(8px);
+  transition:all .18s;
+}
+.sound-btn:active{transform:scale(.96)}
+.msg-panel{
+  flex:1;margin:4px 13px 0;
+  background:rgba(255,255,255,.42);
+  border:1px solid var(--border);
+  border-radius:22px 22px 0 0;
+  padding:12px 13px 8px;
+  display:flex;flex-direction:column;overflow:hidden;
+  backdrop-filter:blur(14px);
+}
+.msg-label{font-family:var(--sans);font-size:9px;color:rgba(139,94,60,.38);letter-spacing:3px;text-transform:uppercase;margin-bottom:8px}
+.msg-opts{display:flex;flex-direction:column;gap:6px;margin-bottom:8px;overflow-y:auto}
+.msg-opts::-webkit-scrollbar{display:none}
+.msg-chip{
+  background:transparent;border:1.5px solid var(--border);
+  border-radius:12px;padding:9px 14px;
+  text-align:start;cursor:pointer;
+  font-family:var(--hand);font-size:15px;
+  color:var(--txt2);transition:all .18s;
+  -webkit-appearance:none;
+}
+.msg-chip.on{color:var(--ac);border-color:var(--ac);background:rgba(139,94,60,.07)}
+.msg-custom{
+  width:100%;
+  background:rgba(255,255,255,.48);
+  border:1.5px solid var(--border);
+  border-radius:12px;padding:9px 14px;
+  font-family:var(--sans);font-size:13px;color:var(--txt);
+  outline:none;-webkit-appearance:none;
+}
+.msg-custom::placeholder{color:rgba(139,94,60,.32);font-style:italic}
+.msg-custom:focus{border-color:var(--ac)}
+
+/* ════════════════════════════════════════════════
+   SCREEN: HISTORY
+════════════════════════════════════════════════ */
+#s-history{overflow:hidden}
+.page-head{padding:calc(var(--st)+18px) 26px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
+.page-title{font-family:var(--hand);font-size:42px;font-weight:700;color:var(--txt);line-height:1}
+.page-sub{font-family:var(--sans);font-size:12px;color:var(--txt2);margin-top:3px}
+.hist-list{flex:1;overflow-y:auto;padding:10px 13px;display:flex;flex-direction:column;gap:8px}
+.hist-list::-webkit-scrollbar{display:none}
+.hist-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:18px;padding:12px 15px;
+  display:flex;align-items:center;gap:12px;
+  animation:slideUp .35s ease both;
+  box-shadow:0 2px 8px rgba(139,94,60,.06);
+}
+.hist-ico{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.hist-name{font-family:var(--hand);font-size:17px;font-weight:700}
+.hist-msg{font-family:var(--sans);font-size:11px;color:var(--txt2);margin-top:2px;font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist-from{font-family:var(--sans);font-size:10px;color:rgba(139,94,60,.38);margin-top:2px}
+.hist-time{font-family:var(--sans);font-size:10px;color:rgba(139,94,60,.32);flex-shrink:0;align-self:flex-start;margin-top:2px}
+.empty{text-align:center;padding:70px 0;font-family:var(--hand);font-size:22px;color:rgba(139,94,60,.28);line-height:1.8}
+
+/* ════════════════════════════════════════════════
+   SCREEN: SETTINGS
+════════════════════════════════════════════════ */
+#s-settings{overflow:hidden}
+.sett-list{flex:1;overflow-y:auto;padding:0 13px 16px;display:flex;flex-direction:column;gap:8px}
+.sett-list::-webkit-scrollbar{display:none}
+.sett-card{background:var(--card);border:1px solid var(--border);border-radius:18px;padding:18px;box-shadow:0 2px 8px rgba(139,94,60,.06)}
+.sett-label{font-family:var(--sans);font-size:9px;color:rgba(139,94,60,.38);letter-spacing:3px;text-transform:uppercase;margin-bottom:13px}
+.sett-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:4px 0}
+.sett-row+.sett-row{border-top:1px solid rgba(139,94,60,.07);margin-top:5px;padding-top:10px}
+.sett-row-title{font-family:var(--hand);font-size:15px;font-weight:700;color:var(--txt);display:block}
+.sett-row-sub{font-family:var(--sans);font-size:11px;color:var(--txt2)}
+.lang-pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.lang-pill{
+  background:rgba(255,255,255,.5);
+  border:1.5px solid var(--border);
+  border-radius:50px;padding:6px 14px;
+  font-family:var(--hand);font-size:13px;
+  color:#5A3820;cursor:pointer;transition:all .18s;
+}
+.lang-pill.on{background:rgba(139,94,60,.1);border-color:var(--ac);color:var(--ac);font-weight:700}
+.conn-row{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.conn-avatar{width:44px;height:44px;border-radius:50%;background:rgba(139,94,60,.14);border:1px solid rgba(139,94,60,.2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.conns-list{display:flex;flex-direction:column;gap:0}
+.conn-item{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid rgba(139,94,60,.07)}
+.conn-item:last-child{border-bottom:none}
+.animal-row{display:flex;align-items:center;gap:12px}
+.animal-emoji{font-size:36px;flex-shrink:0}
+.animal-info{flex:1}
+.animal-name-display{font-family:var(--hand);font-size:18px;font-weight:700;color:var(--txt)}
+.animal-type-display{font-family:var(--sans);font-size:11px;color:var(--txt2);margin-top:2px}
+.sett-btn{background:none;border:1.5px solid rgba(139,94,60,.2);border-radius:50px;padding:9px 18px;font-family:var(--hand);font-size:14px;color:var(--ac);cursor:pointer;transition:all .18s;white-space:nowrap}
+.sett-btn:hover{background:rgba(139,94,60,.07)}
+.sett-btn-danger{color:rgba(180,50,50,.5)}
+
+/* ════════════════════════════════════════════════
+   SCREEN: RECEIVE OVERLAY
+════════════════════════════════════════════════ */
+#s-receive{
+  position:fixed;inset:0;z-index:200;
+  display:none;flex-direction:column;
+  align-items:center;justify-content:space-between;
+  padding:calc(var(--st)+56px) 32px calc(var(--sb)+52px);
+  animation:slideIn .45s ease;
+}
+#s-receive.show{display:flex}
+.rcv-from{font-family:var(--sans);font-size:12px;letter-spacing:4px;text-transform:uppercase;opacity:.48;text-align:center}
+.rcv-body{display:flex;flex-direction:column;align-items:center;gap:18px;animation:slideUp .6s .15s ease both}
+.rcv-sym{font-size:52px;display:block;margin-bottom:-4px}
+.rcv-name{font-family:var(--hand);font-size:36px;font-weight:700;text-align:center;line-height:1}
+.rcv-msg{font-family:var(--hand);font-size:20px;text-align:center;max-width:280px;line-height:1.6;color:rgba(58,32,16,.72)}
+.rcv-actions{width:100%;display:flex;flex-direction:column;gap:11px}
+.rcv-dismiss{background:transparent;border:none;padding:9px;font-family:var(--hand);font-size:15px;color:rgba(139,94,60,.38);cursor:pointer;text-align:center}
+
+/* Loading */
+#loading{position:fixed;inset:0;z-index:600;background:var(--bg2);display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px}
+.spin{width:30px;height:30px;border:2px solid rgba(139,94,60,.2);border-top-color:var(--ac);border-radius:50%;animation:spin .8s linear infinite}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="spin"></div>
+  <div style="font-family:'Caveat',cursive;font-size:20px;font-style:italic;color:rgba(107,64,32,.4)" id="loading-txt">connecting…</div>
+</div>
+
+<!-- LANG -->
+<div id="s-lang" class="screen active">
+  <div style="text-align:center">
+    <span class="logo" onclick="tap5()">pulse</span>
+    <div class="logo-sub">choose your language</div>
+  </div>
+  <div class="title" style="margin-bottom:0">What's your language?</div>
+  <div class="lang-grid">
+    <button class="lang-btn" onclick="pickLang('en')"><span class="lang-flag">🇬🇧</span><span class="lang-name">English</span></button>
+    <button class="lang-btn" onclick="pickLang('he')"><span class="lang-flag">🇮🇱</span><span class="lang-name">עברית</span></button>
+    <button class="lang-btn" onclick="pickLang('ru')"><span class="lang-flag">🇷🇺</span><span class="lang-name">Русский</span></button>
+    <button class="lang-btn" onclick="pickLang('ar')"><span class="lang-flag">🇸🇦</span><span class="lang-name">العربية</span></button>
+  </div>
+</div>
+
+<!-- ONBOARD -->
+<div id="s-onboard" class="screen">
+  <button class="back" id="back-onboard" onclick="show('s-lang')"><span id="back-ob-icon">←</span> <span id="back-ob-txt">Back</span></button>
+  <div style="text-align:center">
+    <span class="logo" onclick="tap5()">pulse</span>
+    <div class="logo-sub" id="ob-tagline">a private emotional shortcut</div>
+  </div>
+  <div class="ob-puppy"><div class="anim-float"><svg width="90" height="102" viewBox="0 0 100 113" fill="none"><ellipse cx="26" cy="37" rx="13.5" ry="21" fill="#B87050" transform="rotate(-18 26 37)"/><ellipse cx="26" cy="39" rx="7.5" ry="13" fill="#DFA880" transform="rotate(-18 26 39)"/><ellipse cx="74" cy="37" rx="13.5" ry="21" fill="#B87050" transform="rotate(18 74 37)"/><ellipse cx="74" cy="39" rx="7.5" ry="13" fill="#DFA880" transform="rotate(18 74 39)"/><circle cx="50" cy="55" r="28" fill="#D8A87A"/><ellipse cx="50" cy="43" rx="16" ry="10" fill="#C4896A" opacity=".32"/><circle cx="40" cy="52" r="5.2" fill="#1C0C06"/><circle cx="41.8" cy="50.2" r="2.1" fill="white" opacity=".88"/><circle cx="60" cy="52" r="5.2" fill="#1C0C06"/><circle cx="61.8" cy="50.2" r="2.1" fill="white" opacity=".88"/><circle cx="32" cy="60" r="7" fill="#F09898" opacity=".2"/><circle cx="68" cy="60" r="7" fill="#F09898" opacity=".2"/><ellipse cx="50" cy="61.5" rx="4.8" ry="3.2" fill="#1C0C06"/><ellipse cx="48.6" cy="60.4" rx="1.6" ry="1.1" fill="white" opacity=".34"/><path d="M44 67Q50 73 56 67" stroke="#1C0C06" stroke-width="1.6" stroke-linecap="round" fill="none"/><ellipse cx="50" cy="96" rx="20" ry="14" fill="#D8A87A"/><path d="M68 91Q86 77 79 63" stroke="#C4896A" stroke-width="9.5" stroke-linecap="round" fill="none" id="tail-ob"/><ellipse cx="37" cy="108" rx="8.5" ry="5.5" fill="#C4896A"/><ellipse cx="63" cy="108" rx="8.5" ry="5.5" fill="#C4896A"/></svg></div></div>
+  <div class="ob-bullets" id="ob-bullets"></div>
+  <button class="btn" id="ob-btn" onclick="show('s-name')"><span id="ob-btn-txt">Continue</span><span>→</span></button>
+</div>
+
+<!-- NAME -->
+<div id="s-name" class="screen">
+  <button class="back" id="back-name" onclick="show('s-onboard')"><span id="back-name-icon">←</span> <span id="back-name-txt">Back</span></button>
+  <div style="text-align:center">
+    <span class="logo" onclick="tap5()">pulse</span>
+    <div class="logo-sub" id="name-tagline">a private emotional shortcut</div>
+  </div>
+  <div class="card setup-card" style="padding:28px 24px">
+    <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:var(--txt);margin-bottom:20px" id="name-q">What's your name?</div>
+    <input class="field" id="inp-name" maxlength="24" autocomplete="off" autocorrect="off" spellcheck="false" style="margin-bottom:14px" onkeydown="if(event.key==='Enter')goName()">
+    <button class="btn" id="name-btn" onclick="goName()"><span id="name-btn-txt">Continue</span><span>→</span></button>
+  </div>
+  <div></div>
+</div>
+
+<!-- RELATION -->
+<div id="s-relation" class="screen">
+  <button class="back" id="back-rel" onclick="show('s-name')"><span id="back-rel-icon">←</span> <span id="back-rel-txt">Back</span></button>
+  <div style="text-align:center">
+    <span class="logo" onclick="tap5()">pulse</span>
+    <div class="logo-sub" id="rel-tagline">a private emotional shortcut</div>
+  </div>
+  <div>
+    <div class="title" id="rel-q">What's your connection?</div>
+    <div class="subtitle" id="rel-sub">pulse will tailor everything for you</div>
+  </div>
+  <div class="rel-options">
+    <button class="rel-btn" onclick="pickRel('romantic')">
+      <span class="rel-icon">♡</span>
+      <div><div class="rel-title" id="rel-r" style="color:#A03050">Romantic Partner</div><div class="rel-sub" id="rel-r-sub">Lover, partner, spouse</div></div>
+    </button>
+    <button class="rel-btn" onclick="pickRel('friend')">
+      <span class="rel-icon">✦</span>
+      <div><div class="rel-title" id="rel-f" style="color:#406090">Close Friend</div><div class="rel-sub" id="rel-f-sub">Best friend, soulmate friend</div></div>
+    </button>
+    <button class="rel-btn" onclick="pickRel('parent')">
+      <span class="rel-icon">◡</span>
+      <div><div class="rel-title" id="rel-p" style="color:#906020">Parent &amp; Child</div><div class="rel-sub" id="rel-p-sub">Parent to child, child to parent</div></div>
+    </button>
+  </div>
+</div>
+
+<!-- SETUP (create/join) -->
+<div id="s-setup" class="screen">
+  <button class="back" id="back-setup" onclick="show('s-relation')"><span id="back-setup-icon">←</span> <span id="back-setup-txt">Back</span></button>
+  <div style="text-align:center">
+    <span class="logo" onclick="tap5()">pulse</span>
+    <div class="logo-sub" id="setup-tagline">a private emotional shortcut</div>
+  </div>
+  <div class="card setup-card" style="padding:28px 24px">
+    <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:var(--txt);margin-bottom:20px" id="setup-q">Your connection</div>
+    <button class="btn" id="create-btn" onclick="createRoom()" style="margin-bottom:0"><span id="create-txt">Create our connection</span></button>
+    <div class="sep" id="or-sep">— or —</div>
+    <input class="field field-code" id="inp-code" maxlength="4" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" style="margin-bottom:12px;text-align:center" onkeydown="if(event.key==='Enter')joinRoom()">
+    <button class="btn" id="join-btn" onclick="joinRoom()" style="background:linear-gradient(135deg,#5B50A2,#3B3080);box-shadow:0 8px 24px rgba(91,80,162,.28)"><span id="join-txt">Join with code</span></button>
+  </div>
+  <div></div>
+</div>
+
+<!-- WAITING -->
+<div id="s-wait" class="screen">
+  <button class="back" id="back-wait" onclick="show('s-setup')"><span id="back-wait-icon">←</span> <span id="back-wait-txt">Back</span></button>
+  <div class="anim-float" style="margin-bottom:22px" id="wait-puppy">
+    <svg width="100" height="113" viewBox="0 0 100 113" fill="none"><ellipse cx="26" cy="37" rx="13.5" ry="21" fill="#B87050" transform="rotate(-18 26 37)"/><ellipse cx="26" cy="39" rx="7.5" ry="13" fill="#DFA880" transform="rotate(-18 26 39)"/><ellipse cx="74" cy="37" rx="13.5" ry="21" fill="#B87050" transform="rotate(18 74 37)"/><ellipse cx="74" cy="39" rx="7.5" ry="13" fill="#DFA880" transform="rotate(18 74 39)"/><circle cx="50" cy="55" r="28" fill="#D8A87A"/><ellipse cx="50" cy="43" rx="16" ry="10" fill="#C4896A" opacity=".32"/><circle cx="40" cy="52" r="5.2" fill="#1C0C06"/><circle cx="41.8" cy="50.2" r="2.1" fill="white" opacity=".88"/><circle cx="60" cy="52" r="5.2" fill="#1C0C06"/><circle cx="61.8" cy="50.2" r="2.1" fill="white" opacity=".88"/><circle cx="32" cy="60" r="7" fill="#F09898" opacity=".2"/><circle cx="68" cy="60" r="7" fill="#F09898" opacity=".2"/><ellipse cx="50" cy="61.5" rx="4.8" ry="3.2" fill="#1C0C06"/><ellipse cx="48.6" cy="60.4" rx="1.6" ry="1.1" fill="white" opacity=".34"/><path d="M44 67Q50 73 56 67" stroke="#1C0C06" stroke-width="1.6" stroke-linecap="round" fill="none"/><ellipse cx="50" cy="96" rx="20" ry="14" fill="#D8A87A"/><path d="M68 91Q86 77 79 63" stroke="#C4896A" stroke-width="9.5" stroke-linecap="round" fill="none" id="tail-wait"/><ellipse cx="37" cy="108" rx="8.5" ry="5.5" fill="#C4896A"/><ellipse cx="63" cy="108" rx="8.5" ry="5.5" fill="#C4896A"/></svg>
+  </div>
+  <div class="wait-code">
+    <span class="wait-code-label" id="wait-code-lbl">your connection code</span>
+    <span class="wait-code-text" id="wait-code" style="color:var(--ac)">----</span>
+  </div>
+  <div style="font-family:'Caveat',cursive;font-size:26px;font-weight:700;color:var(--txt);text-align:center;margin-bottom:8px" id="wait-h">Waiting for your person…</div>
+  <div style="font-family:'DM Sans',sans-serif;font-size:13px;color:var(--txt2);text-align:center;line-height:1.7;margin-bottom:22px" id="wait-p">The moment they join, pulse opens for both of you.</div>
+  <div class="wait-dots" id="wait-dots"></div>
+  <button class="btn btn-ghost" onclick="shareWait()" id="wait-share-btn" style="max-width:260px">Share code again →</button>
+</div>
+
+<!-- SEND -->
+<div id="s-send" class="screen">
+  <div class="topbar">
+    <div class="to-label" id="to-lbl">to my love</div>
+    <div class="badge" onclick="askNotif()"><span class="dot" id="conn-dot" style="background:#bbb"></span><span id="conn-txt">connecting</span></div>
+  </div>
+  <div class="puppy-wrap" id="send-puppy-wrap">
+    <!-- rendered by JS -->
+  </div>
+  <div class="emo-row">
+    <button class="arr" onclick="prevEmo()">‹</button>
+    <div class="emo-center">
+      <span class="emo-sym" id="emo-sym">♡</span>
+      <div class="emo-name" id="emo-name">Miss You</div>
+    </div>
+    <button class="arr" onclick="nextEmo()">›</button>
+  </div>
+  <div class="heart-wrap">
+    <div class="ripple" id="ripple"></div>
+    <div class="particles" id="particles"></div>
+    <button id="send-btn" onclick="sendMoment()">♡</button>
+    <div class="tap-hint" id="tap-hint">tap to send</div>
+    <button class="sound-btn" onclick="openSounds()">💨🦆🐱</button>
+  </div>
+  <div class="msg-panel">
+    <div class="msg-label" id="msg-lbl">Message</div>
+    <div class="msg-opts" id="msg-opts"></div>
+    <input class="msg-custom" id="msg-custom" maxlength="80" autocomplete="off">
+  </div>
+  <nav class="nav">
+    <button class="nav-btn" onclick="goTab('history')"><span class="nav-icon" id="nav-h-i">○</span><span class="nav-label" id="nav-h-l">Moments</span></button>
+    <button class="nav-btn" onclick="goTab('send')"><span class="nav-icon" id="nav-s-i">♡</span><span class="nav-label" id="nav-s-l">Send</span></button>
+    <button class="nav-btn" onclick="goTab('settings')"><span class="nav-icon" id="nav-g-i">···</span><span class="nav-label" id="nav-g-l">Settings</span></button>
+  </nav>
+</div>
+
+<!-- HISTORY -->
+<div id="s-history" class="screen">
+  <div class="page-head">
+    <div class="page-title" id="hist-title">Moments</div>
+    <div class="page-sub" id="hist-sub">Your tiny history together</div>
+  </div>
+  <div class="hist-list" id="hist-list"><div class="empty" id="hist-empty">No moments yet.<br>Send your first feeling.</div></div>
+  <nav class="nav">
+    <button class="nav-btn" onclick="goTab('history')"><span class="nav-icon" id="nav-hh-i" style="color:var(--ac)">○</span><span class="nav-label" id="nav-hh-l" style="color:var(--ac)">Moments</span></button>
+    <button class="nav-btn" onclick="goTab('send')"><span class="nav-icon" id="nav-hs-i">♡</span><span class="nav-label" id="nav-hs-l">Send</span></button>
+    <button class="nav-btn" onclick="goTab('settings')"><span class="nav-icon" id="nav-hg-i">···</span><span class="nav-label" id="nav-hg-l">Settings</span></button>
+  </nav>
+</div>
+
+<!-- SETTINGS -->
+<div id="s-settings" class="screen">
+  <div class="page-head">
+    <div class="page-title" id="sett-title">Settings</div>
+  </div>
+  <div class="sett-list">
+    <!-- Animal -->
+    <div class="sett-card">
+      <div class="sett-label" id="lbl-animal">Our Animal</div>
+      <div class="animal-row">
+        <span class="animal-emoji" id="animal-emoji">🐶</span>
+        <div class="animal-info">
+          <div class="animal-name-display" id="animal-name-d">Buddy</div>
+          <div class="animal-type-display" id="animal-type-d">Dog</div>
+        </div>
+        <button class="sett-btn" onclick="openAnimalPicker()" id="change-animal-btn">Change →</button>
+      </div>
+    </div>
+    <!-- Connection -->
+    <div class="sett-card">
+      <div class="sett-label" id="lbl-conn">Connection</div>
+      <div class="conns-list" id="conns-list"></div>
+      <div style="margin-top:12px;display:flex;gap:9px;flex-wrap:wrap">
+        <button class="sett-btn" onclick="addNewConn()" id="add-conn-btn">+ Add connection</button>
+        <button class="sett-btn" onclick="askNotif()" id="notif-btn">🔔 Notifications</button>
+      </div>
+    </div>
+    <!-- Language -->
+    <div class="sett-card">
+      <div class="sett-label" id="lbl-lang">Language</div>
+      <div class="lang-pills">
+        <button class="lang-pill on" id="lp-en" onclick="changeLang('en')">🇬🇧 English</button>
+        <button class="lang-pill" id="lp-he" onclick="changeLang('he')">🇮🇱 עברית</button>
+        <button class="lang-pill" id="lp-ru" onclick="changeLang('ru')">🇷🇺 Русский</button>
+        <button class="lang-pill" id="lp-ar" onclick="changeLang('ar')">🇸🇦 العربية</button>
+      </div>
+    </div>
+    <!-- Toggles -->
+    <div class="sett-card">
+      <div class="sett-row">
+        <div><span class="sett-row-title" id="tog-vibe-lbl">Vibration</span><span class="sett-row-sub" id="tog-vibe-sub">Feel it before reading</span></div>
+        <button class="tog" id="tog-vibe" onclick="toggleSetting('vibe',this)" style="background:var(--ac)"><div class="tog-thumb" style="inset-inline-start:24px"></div></button>
+      </div>
+      <div class="sett-row">
+        <div><span class="sett-row-title" id="tog-anim-lbl">Puppy animations</span><span class="sett-row-sub" id="tog-anim-sub">Animate on arrival</span></div>
+        <button class="tog" id="tog-anim" onclick="toggleSetting('anim',this)" style="background:var(--ac)"><div class="tog-thumb" style="inset-inline-start:24px"></div></button>
+      </div>
+    </div>
+    <!-- Reset -->
+    <div class="sett-card">
+      <div class="sett-row" style="flex-direction:column;align-items:flex-start;gap:8px">
+        <button class="sett-btn sett-btn-danger" onclick="resetAll()" id="reset-btn">🔄 Reset everything & start fresh</button>
+      </div>
+    </div>
+    <div style="text-align:center;padding:16px 0 8px;font-family:'Caveat',cursive;font-size:17px;color:rgba(139,94,60,.22)">pulse</div>
+  </div>
+  <nav class="nav">
+    <button class="nav-btn" onclick="goTab('history')"><span class="nav-icon" id="nav-gh-i">○</span><span class="nav-label" id="nav-gh-l">Moments</span></button>
+    <button class="nav-btn" onclick="goTab('send')"><span class="nav-icon" id="nav-gs-i">♡</span><span class="nav-label" id="nav-gs-l">Send</span></button>
+    <button class="nav-btn" onclick="goTab('settings')"><span class="nav-icon" id="nav-gg-i" style="color:var(--ac)">···</span><span class="nav-label" id="nav-gg-l" style="color:var(--ac)">Settings</span></button>
+  </nav>
+</div>
+
+<!-- RECEIVE OVERLAY -->
+<div id="s-receive">
+  <div class="rcv-from" id="rcv-from">from my person</div>
+  <div class="rcv-body">
+    <div id="rcv-puppy" class="anim-float">
+      <svg width="130" height="147" viewBox="0 0 100 113" fill="none"><ellipse cx="26" cy="37" rx="13.5" ry="21" fill="#B87050" transform="rotate(-18 26 37)"/><ellipse cx="26" cy="39" rx="7.5" ry="13" fill="#DFA880" transform="rotate(-18 26 39)"/><ellipse cx="74" cy="37" rx="13.5" ry="21" fill="#B87050" transform="rotate(18 74 37)"/><ellipse cx="74" cy="39" rx="7.5" ry="13" fill="#DFA880" transform="rotate(18 74 39)"/><circle cx="50" cy="55" r="28" fill="#D8A87A"/><ellipse cx="50" cy="43" rx="16" ry="10" fill="#C4896A" opacity=".32"/><circle cx="40" cy="52" r="5.2" fill="#1C0C06"/><circle cx="41.8" cy="50.2" r="2.1" fill="white" opacity=".88"/><circle cx="60" cy="52" r="5.2" fill="#1C0C06"/><circle cx="61.8" cy="50.2" r="2.1" fill="white" opacity=".88"/><circle cx="32" cy="60" r="7" fill="#F09898" opacity=".2"/><circle cx="68" cy="60" r="7" fill="#F09898" opacity=".2"/><ellipse cx="50" cy="61.5" rx="4.8" ry="3.2" fill="#1C0C06"/><ellipse cx="48.6" cy="60.4" rx="1.6" ry="1.1" fill="white" opacity=".34"/><path d="M44 67Q50 73 56 67" stroke="#1C0C06" stroke-width="1.6" stroke-linecap="round" fill="none"/><ellipse cx="50" cy="96" rx="20" ry="14" fill="#D8A87A"/><path d="M68 91Q86 77 79 63" stroke="#C4896A" stroke-width="9.5" stroke-linecap="round" fill="none" id="tail-rcv"/><ellipse cx="37" cy="108" rx="8.5" ry="5.5" fill="#C4896A"/><ellipse cx="63" cy="108" rx="8.5" ry="5.5" fill="#C4896A"/></svg>
+    </div>
+    <span class="rcv-sym" id="rcv-sym">♡</span>
+    <div class="rcv-name" id="rcv-name">Miss You</div>
+    <div class="rcv-msg" id="rcv-msg">"I miss you right now"</div>
+  </div>
+  <div class="rcv-actions">
+    <button class="btn" id="rcv-reply-btn" onclick="closeReceive()">Send love back ♡</button>
+    <button class="rcv-dismiss" onclick="closeReceive()" id="rcv-close-btn">Close</button>
+  </div>
+</div>
+
+<!-- MODAL ROOT -->
+<div id="modal-root"></div>
+<div id="toast"></div>
+<div id="ios-banner">
+  <button class="x" onclick="this.parentElement.classList.remove('show')">×</button>
+  <strong>📲 Add pulse to your Home Screen</strong>
+  Safari → Share → "Add to Home Screen" → notifications work on lock screen.
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+// DATA
+// ════════════════════════════════════════════════
+const T = {
+  en:{dir:'ltr',loading:'connecting…',tagline:'a private emotional shortcut',
+    obBullets:[
+      {i:'♡',t:'Just the two of you',s:'A private channel. No groups, no noise, no pressure to reply.'},
+      {i:'👆',t:'One tap sends a feeling',s:'Choose an emotion and tap. It arrives instantly — no typing needed.'},
+      {i:'🐾',t:'The puppy delivers it',s:'Your partner feels your message before they even read it.'},
+      {i:'🔑',t:'Private code to connect',s:'Share a 4-letter code. Only the two of you, always.'},
+    ],
+    cont:'Continue',back:'Back',
+    nameQ:"What's your name?",namePH:'Your name…',
+    relQ:"What's your connection?",relSub:'pulse will tailor everything for you',
+    relR:'Romantic Partner',relRs:'Lover, partner, spouse',
+    relF:'Close Friend',relFs:'Best friend, soulmate friend',
+    relP:'Parent & Child',relPs:'Parent to child, child to parent',
+    setupQ:'Your connection',createBtn:'Create our connection',joinBtn:'Join with code',codePH:'CODE',
+    codeLbl:'your connection code',waitH:'Waiting for your person…',
+    waitP:'The moment they join, pulse opens for both of you.',shareAgain:'Share code again →',
+    toLbl:'to my love',tapHint:'tap to send',sending:'sending…',msgLbl:'MESSAGE',
+    msgPH:'or write something small…',fromPerson:'from my person',
+    replyBtn:'Send love back',closeBtn:'Close',
+    histTitle:'Moments',histSub:'Your tiny history together',histEmpty:'No moments yet.\nSend your first feeling.',
+    settTitle:'Settings',lblAnimal:'Our Animal',lblConn:'Connection',lblLang:'Language',
+    addConn:'+ Add connection',
+    togVibeLbl:'Vibration',togVibeSub:'Feel it before reading',togAnimLbl:'Puppy animations',togAnimSub:'Animate on arrival',
+    resetBtn:'🔄 Reset everything & start fresh',
+    navMoments:'Moments',navSend:'Send',navSettings:'Settings',
+    soundTitle:'Send a sound',soundCancel:'Cancel',
+    animalTitle:'Choose your animal',animalName:'Name your animal',
+    animalSave:'Save',animalCancel:'Cancel',
+    youSent:'You sent',theySent:'sent',justNow:'Just now',yesterday:'Yesterday',
+    notConnected:'Not connected — check signal',copied:'Copied! 📋',notifOn:'Notifications enabled 🔔',
+    enterName:'Enter your name 🌸',enterCode:'Enter the 4-letter code',
+  },
+  he:{dir:'rtl',loading:'מתחבר…',tagline:'קיצור דרך רגשי פרטי',
+    obBullets:[
+      {i:'♡',t:'רק אתם שניים',s:'ערוץ פרטי. ללא קבוצות, ללא רעש, ללא לחץ לענות.'},
+      {i:'👆',t:'לחיצה אחת שולחת רגש',s:'בחר רגש ולחץ. מגיע מיד — ללא צורך בהקלדה.'},
+      {i:'🐾',t:'הגור מביא אותו',s:'השני מרגיש את ההודעה שלך לפני שהוא אפילו קורא.'},
+      {i:'🔑',t:'קוד פרטי לחיבור',s:'שתף קוד של 4 אותיות. רק אתם שניים, תמיד.'},
+    ],
+    cont:'המשך',back:'חזור',
+    nameQ:'מה שמך?',namePH:'שמך…',
+    relQ:'מה הקשר שלך?',relSub:'pulse יתאים הכל עבורך',
+    relR:'בני זוג',relRs:'אוהבים, שותפים, נשואים',
+    relF:'חבר קרוב',relFs:'חבר טוב, נשמה תאומה',
+    relP:'הורה וילד',relPs:'מהורה לילד ולהפך',
+    setupQ:'החיבור שלכם',createBtn:'צרו את החיבור שלנו',joinBtn:'הצטרף עם קוד',codePH:'קוד',
+    codeLbl:'קוד החיבור שלך',waitH:'ממתין לאדם שלך…',
+    waitP:'ברגע שיצטרף, pulse ייפתח לשניכם.',shareAgain:'שתף קוד שוב ←',
+    toLbl:'לאהוב שלי',tapHint:'לחץ לשליחה',sending:'שולח…',msgLbl:'הודעה',
+    msgPH:'או כתוב משהו קטן…',fromPerson:'מהאדם שלי',
+    replyBtn:'שלח אהבה בחזרה',closeBtn:'סגור',
+    histTitle:'רגעים',histSub:'ההיסטוריה הקטנה שלכם',histEmpty:'עדיין אין רגעים.\nשלח את הרגש הראשון שלך.',
+    settTitle:'הגדרות',lblAnimal:'החיה שלנו',lblConn:'חיבור',lblLang:'שפה',
+    addConn:'+ הוסף חיבור',
+    togVibeLbl:'רטט',togVibeSub:'הרגש לפני קריאה',togAnimLbl:'אנימציות הגור',togAnimSub:'אנימציה בקבלה',
+    resetBtn:'🔄 אפס הכל והתחל מחדש',
+    navMoments:'רגעים',navSend:'שלח',navSettings:'הגדרות',
+    soundTitle:'שלח צליל',soundCancel:'ביטול',
+    animalTitle:'בחרו חיה',animalName:'שם החיה שלכם',
+    animalSave:'שמור',animalCancel:'ביטול',
+    youSent:'שלחת',theySent:'שלח',justNow:'עכשיו',yesterday:'אתמול',
+    notConnected:'לא מחובר — בדוק אות',copied:'הועתק! 📋',notifOn:'התראות הופעלו 🔔',
+    enterName:'הכנס את שמך 🌸',enterCode:'הכנס קוד של 4 אותיות',
+  },
+  ru:{dir:'ltr',loading:'подключение…',tagline:'личный эмоциональный ярлык',
+    obBullets:[
+      {i:'♡',t:'Только вас двое',s:'Личный канал. Без групп, без шума, без давления.'},
+      {i:'👆',t:'Одно касание — чувство',s:'Выбери эмоцию и нажми. Приходит мгновенно.'},
+      {i:'🐾',t:'Щенок доставит',s:'Партнёр почувствует твоё сообщение ещё до прочтения.'},
+      {i:'🔑',t:'Приватный код для связи',s:'Поделись 4-буквенным кодом. Только вас двое.'},
+    ],
+    cont:'Продолжить',back:'Назад',
+    nameQ:'Как вас зовут?',namePH:'Ваше имя…',
+    relQ:'Какая у вас связь?',relSub:'pulse подстроится под вас',
+    relR:'Романтический партнёр',relRs:'Любовник, партнёр, супруг',
+    relF:'Близкий друг',relFs:'Лучший друг, родственная душа',
+    relP:'Родитель и ребёнок',relPs:'От родителя к ребёнку и обратно',
+    setupQ:'Ваше соединение',createBtn:'Создать соединение',joinBtn:'Войти по коду',codePH:'КОД',
+    codeLbl:'ваш код соединения',waitH:'Ожидание вашего человека…',
+    waitP:'Как только подключится, pulse откроется для обоих.',shareAgain:'Поделиться кодом снова →',
+    toLbl:'моему любимому',tapHint:'нажмите для отправки',sending:'отправка…',msgLbl:'СООБЩЕНИЕ',
+    msgPH:'или напишите что-нибудь маленькое…',fromPerson:'от моего человека',
+    replyBtn:'Послать любовь в ответ',closeBtn:'Закрыть',
+    histTitle:'Моменты',histSub:'Ваша маленькая история',histEmpty:'Моментов пока нет.\nОтправьте первое чувство.',
+    settTitle:'Настройки',lblAnimal:'Наше животное',lblConn:'Соединение',lblLang:'Язык',
+    addConn:'+ Добавить',
+    togVibeLbl:'Вибрация',togVibeSub:'Почувствуй до прочтения',togAnimLbl:'Анимация щенка',togAnimSub:'Анимировать при получении',
+    resetBtn:'🔄 Сбросить всё и начать заново',
+    navMoments:'Моменты',navSend:'Отправить',navSettings:'Настройки',
+    soundTitle:'Отправить звук',soundCancel:'Отмена',
+    animalTitle:'Выберите животное',animalName:'Имя животного',
+    animalSave:'Сохранить',animalCancel:'Отмена',
+    youSent:'Вы отправили',theySent:'отправил',justNow:'Только что',yesterday:'Вчера',
+    notConnected:'Нет соединения — проверьте сеть',copied:'Скопировано! 📋',notifOn:'Уведомления включены 🔔',
+    enterName:'Введите ваше имя 🌸',enterCode:'Введите 4-буквенный код',
+  },
+  ar:{dir:'rtl',loading:'جارٍ الاتصال…',tagline:'اختصار عاطفي خاص',
+    obBullets:[
+      {i:'♡',t:'فقط أنتما الاثنان',s:'قناة خاصة. بلا مجموعات، بلا ضجيج، بلا ضغط للرد.'},
+      {i:'👆',t:'نقرة واحدة ترسل شعوراً',s:'اختر مشاعرك واضغط. يصل فوراً بلا كتابة.'},
+      {i:'🐾',t:'الجرو يوصّله',s:'شريكك يشعر برسالتك قبل أن يقرأها.'},
+      {i:'🔑',t:'كود خاص للتواصل',s:'شارك كوداً من 4 أحرف. أنتما فقط، دائماً.'},
+    ],
+    cont:'التالي',back:'رجوع',
+    nameQ:'ما اسمك؟',namePH:'اسمك…',
+    relQ:'ما طبيعة علاقتكما؟',relSub:'سيكيّف pulse كل شيء لك',
+    relR:'شريك رومانسي',relRs:'حبيب، شريك، زوج',
+    relF:'صديق مقرّب',relFs:'أفضل صديق، روح توأم',
+    relP:'والد وطفل',relPs:'من الوالد للطفل والعكس',
+    setupQ:'اتصالكما',createBtn:'أنشئ اتصالنا',joinBtn:'انضم بكود',codePH:'الكود',
+    codeLbl:'كود الاتصال',waitH:'بانتظار شخصك…',
+    waitP:'حال انضمامه، سيفتح pulse لكليكما.',shareAgain:'شارك الكود مجدداً ←',
+    toLbl:'إلى حبيبي',tapHint:'اضغط للإرسال',sending:'جارٍ الإرسال…',msgLbl:'الرسالة',
+    msgPH:'أو اكتب شيئاً صغيراً…',fromPerson:'من شخصي',
+    replyBtn:'أرسل الحب بالمقابل',closeBtn:'إغلاق',
+    histTitle:'اللحظات',histSub:'تاريخكما الصغير',histEmpty:'لا لحظات بعد.\nأرسل أول شعور.',
+    settTitle:'الإعدادات',lblAnimal:'حيواننا',lblConn:'الاتصال',lblLang:'اللغة',
+    addConn:'+ أضف',
+    togVibeLbl:'الاهتزاز',togVibeSub:'اشعر به قبل القراءة',togAnimLbl:'حركات الجرو',togAnimSub:'تحريك عند الاستقبال',
+    resetBtn:'🔄 إعادة تعيين كل شيء',
+    navMoments:'اللحظات',navSend:'إرسال',navSettings:'الإعدادات',
+    soundTitle:'أرسل صوتاً',soundCancel:'إلغاء',
+    animalTitle:'اختر حيواناً',animalName:'اسم حيوانكما',
+    animalSave:'حفظ',animalCancel:'إلغاء',
+    youSent:'أرسلت',theySent:'أرسل',justNow:'الآن',yesterday:'أمس',
+    notConnected:'لا اتصال — تحقق من الإشارة',copied:'تم النسخ! 📋',notifOn:'تم تفعيل الإشعارات 🔔',
+    enterName:'أدخل اسمك 🌸',enterCode:'أدخل الكود المكوّن من 4 أحرف',
+  },
+};
+
+const RELATIONS = {
+  romantic:{icon:'♡',ac:'#A03050',
+    emos:{
+      en:[
+        {key:'miss',    sym:'♡', name:'Miss You',        ac:'#B04060',vibe:[80,60,80],msgs:['I miss you right now','You popped into my head','I suddenly wanted you near','A small wave of missing you']},
+        {key:'thinking',sym:'✦', name:'Thinking of You', ac:'#6050A8',vibe:[60],    msgs:['You crossed my mind','Just thought about you','In the middle of everything, you appeared','Tiny moment, big thought of you']},
+        {key:'hug',     sym:'◡', name:'Need a Hug',      ac:'#905020',vibe:[300],   msgs:['I need your hug','I wish I could hold you right now','I need a little closeness','Missing your warmth']},
+        {key:'desire',  sym:'⚡',name:'Desire',           ac:'#A02840',vibe:[50,30,50,30,80],msgs:['I really want you right now','You are on my mind in that way','Sending you a stronger kind of missing','This one comes with heat']},
+      ],
+      he:[
+        {key:'miss',    sym:'♡', name:'מתגעגע',   ac:'#B04060',vibe:[80,60,80],msgs:['אני מתגעגע אליך עכשיו','צצת לי בראש','פתאום רציתי אותך קרוב','גל קטן של געגוע אליך']},
+        {key:'thinking',sym:'✦', name:'חושב עליך', ac:'#6050A8',vibe:[60],    msgs:['עברת לי בראש','רק חשבתי עליך','בתוך הכל הופעת','רגע קטן, מחשבה גדולה עליך']},
+        {key:'hug',     sym:'◡', name:'צריך חיבוק',ac:'#905020',vibe:[300],   msgs:['אני צריך את החיבוק שלך','הלוואי יכולתי להחזיק אותך','צריך קרבה','מתגעגע לחמימות שלך']},
+        {key:'desire',  sym:'⚡',name:'תשוקה',     ac:'#A02840',vibe:[50,30,50,30,80],msgs:['אני ממש רוצה אותך עכשיו','אתה על הראש שלי בצורה הזו','שולח לך געגוע חזק','הזה מגיע עם חום']},
+      ],
+      ru:[
+        {key:'miss',    sym:'♡', name:'Скучаю',          ac:'#B04060',vibe:[80,60,80],msgs:['Скучаю по тебе сейчас','Ты пришёл в голову','Вдруг захотелось тебя рядом','Маленькая волна тоски']},
+        {key:'thinking',sym:'✦', name:'Думаю о тебе',    ac:'#6050A8',vibe:[60],    msgs:['Ты промелькнул в мыслях','Просто подумал о тебе','Среди всего ты появился','Маленький момент, большая мысль']},
+        {key:'hug',     sym:'◡', name:'Нужны объятия',   ac:'#905020',vibe:[300],   msgs:['Мне нужны твои объятия','Хочу обнять тебя сейчас','Хочется близости','Скучаю по твоему теплу']},
+        {key:'desire',  sym:'⚡',name:'Желание',          ac:'#A02840',vibe:[50,30,50,30,80],msgs:['Очень хочу тебя сейчас','Ты у меня в голове именно так','Посылаю сильную тоску','Это с жаром']},
+      ],
+      ar:[
+        {key:'miss',    sym:'♡', name:'أشتاق إليك',ac:'#B04060',vibe:[80,60,80],msgs:['أشتاق إليك الآن','خطرت على بالي','أردتك فجأة بجانبي','موجة صغيرة من الشوق']},
+        {key:'thinking',sym:'✦', name:'أفكر فيك',  ac:'#6050A8',vibe:[60],    msgs:['خطرت على بالي','فكرت فيك للتو','في خضم كل شيء ظهرت','لحظة صغيرة فكرة كبيرة']},
+        {key:'hug',     sym:'◡', name:'أحتاج عناقاً',ac:'#905020',vibe:[300], msgs:['أحتاج عناقك','أتمنى لو أضمك الآن','أحتاج قليلاً من القرب','أشتاق لدفئك']},
+        {key:'desire',  sym:'⚡',name:'شغف',        ac:'#A02840',vibe:[50,30,50,30,80],msgs:['أريدك الآن جداً','أنت في ذهني بتلك الطريقة','أرسل لك شوقاً أقوى','هذه تأتي بحرارة']},
+      ],
+    }
+  },
+  friend:{icon:'✦',ac:'#305880',
+    emos:{
+      en:[
+        {key:'miss',    sym:'○', name:'Missing You',     ac:'#306080',vibe:[80,60,80],msgs:['I miss having you around','Thought of something, wanted to tell you','You crossed my mind today','Wishing you were here']},
+        {key:'thinking',sym:'✦', name:'Thinking of You', ac:'#5048A0',vibe:[60],    msgs:['Just thought about you','Something reminded me of you','You randomly popped in my head','Sending you a little thought']},
+        {key:'hug',     sym:'◡', name:'Sending a Hug',   ac:'#407858',vibe:[300],   msgs:['Sending you a big hug','Wish I could be there','You deserve all the good things','Thinking of you']},
+        {key:'laugh',   sym:'☀', name:'Made Me Think',   ac:'#906020',vibe:[50,80,50],msgs:['This made me think of you','You would have loved this','Had a moment that was so us','Wish you were here for this']},
+      ],
+      he:[
+        {key:'miss',    sym:'○', name:'מתגעגע',           ac:'#306080',vibe:[80,60,80],msgs:['מתגעגע שתהיה פה','חשבתי על משהו ורציתי לספר לך','עברת לי בראש היום','הלוואי היית פה']},
+        {key:'thinking',sym:'✦', name:'חושב עליך',        ac:'#5048A0',vibe:[60],    msgs:['רק חשבתי עליך','משהו הזכיר לי אותך','צצת לי בראש בלי סיבה','שולח לך מחשבה קטנה']},
+        {key:'hug',     sym:'◡', name:'חיבוק גדול',       ac:'#407858',vibe:[300],   msgs:['שולח לך חיבוק גדול','הלוואי יכולתי להיות איתך','מגיע לך כל הטוב','חושב עליך']},
+        {key:'laugh',   sym:'☀', name:'גרמת לי לחשוב',    ac:'#906020',vibe:[50,80,50],msgs:['זה גרם לי לחשוב עליך','היית אוהב את זה','הייתה לי רגע שהיה כל כך אנחנו','הלוואי היית פה']},
+      ],
+      ru:[
+        {key:'miss',    sym:'○', name:'Скучаю',            ac:'#306080',vibe:[80,60,80],msgs:['Скучаю по тебе','Подумал кое-о-чём, хотел рассказать','Ты промелькнул сегодня','Жаль, тебя нет рядом']},
+        {key:'thinking',sym:'✦', name:'Думаю о тебе',      ac:'#5048A0',vibe:[60],    msgs:['Просто подумал о тебе','Кое-что напомнило тебя','Ты случайно пришёл в голову','Посылаю маленькую мысль']},
+        {key:'hug',     sym:'◡', name:'Обнимаю',           ac:'#407858',vibe:[300],   msgs:['Посылаю большое объятие','Хотел бы быть рядом','Ты заслуживаешь всего хорошего','Думаю о тебе']},
+        {key:'laugh',   sym:'☀', name:'Ты вспомнился',     ac:'#906020',vibe:[50,80,50],msgs:['Это напомнило мне о тебе','Тебе бы понравилось','Был момент как будто мы вместе','Жаль тебя не было']},
+      ],
+      ar:[
+        {key:'miss',    sym:'○', name:'أشتاق إليك',         ac:'#306080',vibe:[80,60,80],msgs:['أشتاق لوجودك','فكرت بشيء وأردت إخبارك','خطرت على بالي اليوم','أتمنى لو كنت هنا']},
+        {key:'thinking',sym:'✦', name:'أفكر فيك',           ac:'#5048A0',vibe:[60],    msgs:['فكرت فيك للتو','شيء ذكرني بك','خطرت على بالي فجأة','أرسل لك فكرة صغيرة']},
+        {key:'hug',     sym:'◡', name:'أرسل عناقاً',        ac:'#407858',vibe:[300],   msgs:['أرسل لك عناقاً كبيراً','أتمنى لو كنت معك','تستحق كل الجميل','أفكر فيك']},
+        {key:'laugh',   sym:'☀', name:'ذكّرني بك',          ac:'#906020',vibe:[50,80,50],msgs:['هذا ذكرني بك','كنت ستحب هذا','كان لديّ لحظة تشبهنا','ليتك كنت هنا']},
+      ],
+    }
+  },
+  parent:{icon:'◡',ac:'#806020',
+    emos:{
+      en:[
+        {key:'love',    sym:'♡', name:'Sending Love',    ac:'#986030',vibe:[80,60,80],msgs:['Sending you so much love','Thinking about you today','You are always in my heart','Just wanted to say I love you']},
+        {key:'thinking',sym:'✦', name:'Thinking of You', ac:'#6050A0',vibe:[60],    msgs:['Just thinking about you','You crossed my mind today','Wanted to check in on you','Hope your day is going well']},
+        {key:'proud',   sym:'★', name:'Proud of You',    ac:'#806020',vibe:[300],   msgs:['I am so proud of you','You are doing so well','I see how hard you work','You make me smile every day']},
+        {key:'hug',     sym:'◡', name:'Need a Hug',      ac:'#905828',vibe:[50,30,50,30,80],msgs:['I need one of your hugs','Wishing I could be with you','Missing you a lot right now','Can we talk soon?']},
+      ],
+      he:[
+        {key:'love',    sym:'♡', name:'שולח אהבה', ac:'#986030',vibe:[80,60,80],msgs:['שולח לך המון אהבה','חושב עליך היום','אתה תמיד בלב שלי','רק רציתי לגיד שאני אוהב אותך']},
+        {key:'thinking',sym:'✦', name:'חושב עליך', ac:'#6050A0',vibe:[60],    msgs:['רק חושב עליך','עברת לי בראש היום','רציתי לבדוק שהכל בסדר','מקווה שהיום שלך טוב']},
+        {key:'proud',   sym:'★', name:'גאה בך',    ac:'#806020',vibe:[300],   msgs:['אני כל כך גאה בך','אתה עושה מדהים','אני רואה כמה אתה עובד קשה','אתה גורם לי לחייך כל יום']},
+        {key:'hug',     sym:'◡', name:'צריך חיבוק',ac:'#905828',vibe:[50,30,50,30,80],msgs:['אני צריך אחד מהחיבוקים שלך','הלוואי יכולתי להיות איתך','מתגעגע אליך מאוד','אפשר לדבר בקרוב?']},
+      ],
+      ru:[
+        {key:'love',    sym:'♡', name:'Посылаю любовь',  ac:'#986030',vibe:[80,60,80],msgs:['Посылаю много любви','Думаю о тебе сегодня','Ты всегда в моём сердце','Просто хотел сказать что люблю']},
+        {key:'thinking',sym:'✦', name:'Думаю о тебе',    ac:'#6050A0',vibe:[60],    msgs:['Просто думаю о тебе','Ты пришёл на ум сегодня','Хотел проверить как ты','Надеюсь день хороший']},
+        {key:'proud',   sym:'★', name:'Горжусь тобой',  ac:'#806020',vibe:[300],   msgs:['Я так горжусь тобой','Ты так хорошо справляешься','Вижу как ты стараешься','Ты заставляешь улыбаться каждый день']},
+        {key:'hug',     sym:'◡', name:'Нужны объятия',  ac:'#905828',vibe:[50,30,50,30,80],msgs:['Мне нужны твои объятия','Хотел бы быть с тобой','Очень скучаю сейчас','Можем поговорить скоро?']},
+      ],
+      ar:[
+        {key:'love',    sym:'♡', name:'أرسل لك الحب',   ac:'#986030',vibe:[80,60,80],msgs:['أرسل لك الكثير من الحب','أفكر فيك اليوم','أنت دائماً في قلبي','أردت فقط أن أقول إنني أحبك']},
+        {key:'thinking',sym:'✦', name:'أفكر فيك',        ac:'#6050A0',vibe:[60],    msgs:['أفكر فيك للتو','خطرت على بالي اليوم','أردت الاطمئنان عليك','أتمنى أن يكون يومك جيداً']},
+        {key:'proud',   sym:'★', name:'فخور بك',         ac:'#806020',vibe:[300],   msgs:['أنا فخور جداً بك','أنت تؤدي بشكل رائع','أرى كم تعمل بجد','أنت تجعلني أبتسم كل يوم']},
+        {key:'hug',     sym:'◡', name:'أحتاج عناقاً',    ac:'#905828',vibe:[50,30,50,30,80],msgs:['أحتاج أحد أحضانك','أتمنى لو كنت معك','أشتاق إليك كثيراً الآن','هل يمكننا التحدث قريباً؟']},
+      ],
+    }
+  },
+};
+
+const ANIMALS = {
+  dog:  {emoji:'🐶',en:'Dog',  he:'כלב',  ru:'Собака', ar:'كلب'},
+  cat:  {emoji:'🐱',en:'Cat',  he:'חתול', ru:'Кошка',  ar:'قطة'},
+  bear: {emoji:'🐻',en:'Bear', he:'דוב',  ru:'Медведь',ar:'دب'},
+  bunny:{emoji:'🐰',en:'Bunny',he:'ארנב', ru:'Зайчик', ar:'أرنب'},
+  fox:  {emoji:'🦊',en:'Fox',  he:'שועל', ru:'Лиса',   ar:'ثعلب'},
+  panda:{emoji:'🐼',en:'Panda',he:'פנדה', ru:'Панда',  ar:'باندا'},
+  koala:{emoji:'🐨',en:'Koala',he:'קואלה',ru:'Коала',  ar:'كوالا'},
+  lion: {emoji:'🦁',en:'Lion', he:'אריה', ru:'Лев',    ar:'أسد'},
+};
+
+// ════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════
+let lang = 'en';
+let rel = 'romantic';
+let emos = [];
+let eIdx = 0;
+let selMsg = null;
+let moments = [];
+let settings = {vibe:true,anim:true};
+let mq = null, mqOk = false;
+let _toastTimer = null;
+let _logoTaps = 0, _logoTimer = null;
+
+const S = {
+  g: k => localStorage.getItem('px_' + k),
+  s: (k,v) => localStorage.setItem('px_' + k, v),
+  d: k => localStorage.removeItem('px_' + k),
+};
+const uid  = () => Math.random().toString(36).slice(2,12);
+const code = () => { const a='ABCDEFGHJKLMNPQRSTUVWXYZ'; return Array.from({length:4},()=>a[Math.floor(Math.random()*a.length)]).join(''); };
+const L    = () => T[lang] || T.en;
+const topic  = r => 'pulse/v7/' + r;
+const jtopic = r => 'pulse/v7/' + r + '/join';
+const htopic = r => 'pulse/v7/' + r + '/hist';
+
+// ════════════════════════════════════════════════
+// DOM HELPERS
+// ════════════════════════════════════════════════
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById(id);
+  if (el) el.classList.add('active');
+}
+function el(id) { return document.getElementById(id); }
+function txt(id, val) { const e = el(id); if (e && val != null) e.textContent = val; }
+function toast(msg) {
+  const t = el('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2700);
+}
+
+// ════════════════════════════════════════════════
+// TAIL ANIMATION (JS-driven, cross-browser)
+// ════════════════════════════════════════════════
+function animTails() {
+  let t = 0;
+  (function frame() {
+    t += 0.04;
+    const a = Math.sin(t) * 22;
+    ['tail-ob','tail-wait','tail-rcv','tail-send'].forEach(id => {
+      const e = el(id);
+      if (e) { e.style.transform = `rotate(${a}deg)`; e.style.transformOrigin = '68px 91px'; }
+    });
+    requestAnimationFrame(frame);
+  })();
+}
+
+// ════════════════════════════════════════════════
+// LANGUAGE
+// ════════════════════════════════════════════════
+function applyLang() {
+  const l = L();
+  const dir = l.dir;
+  document.documentElement.lang = lang;
+  document.documentElement.dir = dir;
+
+  // Back buttons
+  const arrow = dir === 'rtl' ? '→' : '←';
+  document.querySelectorAll('.back').forEach(b => {
+    const icon = b.querySelector('[id$="-icon"]');
+    if (icon) icon.textContent = arrow;
+  });
+
+  // Texts
+  const map = {
+    'loading-txt': l.loading,
+    'ob-tagline': l.tagline, 'name-tagline': l.tagline,
+    'rel-tagline': l.tagline, 'setup-tagline': l.tagline,
+    'back-ob-txt': l.back, 'back-name-txt': l.back,
+    'back-rel-txt': l.back, 'back-setup-txt': l.back,
+    'back-wait-txt': l.back,
+    'ob-btn-txt': l.cont,
+    'name-q': l.nameQ, 'name-btn-txt': l.cont,
+    'rel-q': l.relQ, 'rel-sub': l.relSub,
+    'rel-r': l.relR, 'rel-r-sub': l.relRs,
+    'rel-f': l.relF, 'rel-f-sub': l.relFs,
+    'rel-p': l.relP, 'rel-p-sub': l.relPs,
+    'setup-q': l.setupQ, 'create-txt': l.createBtn, 'join-txt': l.joinBtn,
+    'wait-code-lbl': l.codeLbl, 'wait-h': l.waitH, 'wait-p': l.waitP,
+    'wait-share-btn': l.shareAgain,
+    'tap-hint': l.tapHint, 'msg-lbl': l.msgLbl,
+    'hist-title': l.histTitle, 'hist-sub': l.histSub,
+    'sett-title': l.settTitle, 'lbl-animal': l.lblAnimal,
+    'lbl-conn': l.lblConn, 'lbl-lang': l.lblLang,
+    'add-conn-btn': l.addConn,
+    'tog-vibe-lbl': l.togVibeLbl, 'tog-vibe-sub': l.togVibeSub,
+    'tog-anim-lbl': l.togAnimLbl, 'tog-anim-sub': l.togAnimSub,
+    'reset-btn': l.resetBtn,
+    'nav-h-l': l.navMoments, 'nav-s-l': l.navSend, 'nav-g-l': l.navSettings,
+    'nav-hh-l': l.navMoments,'nav-hs-l': l.navSend, 'nav-hg-l': l.navSettings,
+    'nav-gh-l': l.navMoments,'nav-gs-l': l.navSend, 'nav-gg-l': l.navSettings,
+    'rcv-close-btn': l.closeBtn,
+  };
+  Object.entries(map).forEach(([id, val]) => txt(id, val));
+
+  // Placeholders
+  const inp = el('inp-name'); if (inp) inp.placeholder = l.namePH;
+  const ipc = el('inp-code'); if (ipc) ipc.placeholder = l.codePH;
+  const mc  = el('msg-custom'); if (mc) mc.placeholder = l.msgPH;
+
+  // Lang pills
+  ['en','he','ru','ar'].forEach(k => {
+    const p = el('lp-' + k);
+    if (p) p.classList.toggle('on', k === lang);
+  });
+
+  // update onboarding bullets
+  renderBullets();
+  // update emotion messages
+  if (emos.length) buildMsgOpts();
+  // update history empty text
+  const he = el('hist-empty'); if (he) he.innerHTML = l.histEmpty.replace('\n','<br>');
+  // update receive buttons
+  updateRcvBtn();
+}
+
+function pickLang(l) {
+  lang = l;
+  S.s('lang', l);
+  applyLang();
+  show('s-onboard');
+}
+function changeLang(l) {
+  lang = l;
+  S.s('lang', l);
+  applyLang();
+  // reload emos for new lang
+  loadEmos();
+  updateEmoUI();
+  renderHistory();
+}
+
+// ════════════════════════════════════════════════
+// ONBOARDING
+// ════════════════════════════════════════════════
+function renderBullets() {
+  const container = el('ob-bullets');
+  if (!container) return;
+  const bullets = L().obBullets;
+  container.innerHTML = '';
+  container.style.direction = L().dir;
+  bullets.forEach((b, i) => {
+    const row = document.createElement('div');
+    row.className = 'ob-bullet';
+    row.style.animationDelay = i * 0.07 + 's';
+    const ico = document.createElement('div');
+    ico.className = 'ob-bullet-icon'; ico.textContent = b.i;
+    const txtDiv = document.createElement('div');
+    const title = document.createElement('div');
+    title.className = 'ob-bullet-title'; title.textContent = b.t;
+    const sub = document.createElement('div');
+    sub.className = 'ob-bullet-sub'; sub.textContent = b.s;
+    txtDiv.appendChild(title); txtDiv.appendChild(sub);
+    if (L().dir === 'rtl') { row.appendChild(txtDiv); row.appendChild(ico); }
+    else { row.appendChild(ico); row.appendChild(txtDiv); }
+    container.appendChild(row);
+  });
+}
+
+// ════════════════════════════════════════════════
+// NAME
+// ════════════════════════════════════════════════
+function goName() {
+  const n = (el('inp-name').value || '').trim();
+  if (!n) { toast(L().enterName); return; }
+  S.s('userName', n);
+  show('s-relation');
+}
+
+// ════════════════════════════════════════════════
+// RELATION
+// ════════════════════════════════════════════════
+function pickRel(r) {
+  rel = r;
+  S.s('relation', r);
+  loadEmos();
+  updateAC(RELATIONS[r].ac);
+  show('s-setup');
+}
+function loadEmos() {
+  const relData = RELATIONS[rel] || RELATIONS.romantic;
+  emos = (relData.emos[lang] || relData.emos.en).slice();
+  // merge custom emotions
+  try {
+    const custom = JSON.parse(S.g('customEmos_' + rel) || '[]');
+    emos = emos.concat(custom);
+  } catch(e) {}
+  eIdx = Math.min(eIdx, emos.length - 1);
+}
+function updateAC(ac) {
+  document.documentElement.style.setProperty('--ac', ac);
+  document.documentElement.style.setProperty('--chip', ac + '44');
+}
+
+// ════════════════════════════════════════════════
+// SETUP — CREATE / JOIN
+// ════════════════════════════════════════════════
+function createRoom() {
+  const c = code(), u = uid();
+  S.s('userId', u); S.s('room', c); S.s('isCreator', '1');
+  saveConn(c, u, S.g('userName'), rel, '');
+  txt('wait-code', c);
+  el('wait-code').style.color = RELATIONS[rel].ac;
+  buildWaitDots();
+  show('s-wait');
+  mq.subscribe(jtopic(c), {qos:1});
+  mq.subscribe(htopic(c), {qos:1});
+  mq.on('message', onMqMsg);
+}
+function joinRoom() {
+  const c = (el('inp-code').value || '').trim().toUpperCase();
+  if (c.length !== 4) { toast(L().enterCode); return; }
+  const u = uid();
+  S.s('userId', u); S.s('room', c);
+  saveConn(c, u, S.g('userName'), rel, '');
+  mq.subscribe(htopic(c), {qos:1});
+  mq.publish(jtopic(c), JSON.stringify({type:'join',userId:u,name:S.g('userName'),ts:Date.now()}), {qos:1});
+  enterApp();
+}
+function shareWait() {
+  const c = S.g('room');
+  const url = location.href.split('?')[0];
+  const msg = `Join me on pulse 💌\n${L().codeLbl}: ${c}\n${url}`;
+  if (navigator.share) navigator.share({title:'pulse', text:msg});
+  else { navigator.clipboard?.writeText(msg); toast(L().copied); }
+}
+function buildWaitDots() {
+  const c = el('wait-dots'); if (!c) return;
+  c.innerHTML = '';
+  [0,1,2].forEach(i => {
+    const d = document.createElement('div');
+    d.className = 'wait-dot';
+    d.style.background = RELATIONS[rel].ac;
+    d.style.animation = `blink 1.6s ${i*.3}s ease-in-out infinite`;
+    c.appendChild(d);
+  });
+}
+
+// ════════════════════════════════════════════════
+// CONNECTIONS
+// ════════════════════════════════════════════════
+function getConns() { try { return JSON.parse(localStorage.getItem('px_conns') || '[]'); } catch(e) { return []; } }
+function saveConns(arr) { localStorage.setItem('px_conns', JSON.stringify(arr)); }
+function saveConn(room, userId, myName, relation, partnerName) {
+  const arr = getConns();
+  const id = 'c' + Date.now();
+  arr.push({id, room, userId, myName, relation, partnerName, createdAt: Date.now()});
+  saveConns(arr);
+  S.s('activeConn', id);
+  return id;
+}
+function updateConnPartner(room, partnerName) {
+  const arr = getConns();
+  const c = arr.find(x => x.room === room);
+  if (c) { c.partnerName = partnerName; saveConns(arr); }
+}
+function getActiveConn() {
+  const id = S.g('activeConn');
+  const arr = getConns();
+  return arr.find(c => c.id === id) || arr[0] || null;
+}
+function addNewConn() {
+  S.d('room'); S.d('userId'); S.d('partnerName'); S.d('relation');
+  show('s-relation');
+}
+function renderConns() {
+  const container = el('conns-list'); if (!container) return;
+  container.innerHTML = '';
+  const arr = getConns();
+  const activeId = S.g('activeConn');
+  if (!arr.length) {
+    const p = document.createElement('p');
+    p.style.cssText = 'font-family:var(--sans);font-size:12px;color:var(--txt2);padding:4px 0';
+    p.textContent = 'No connections yet.';
+    container.appendChild(p); return;
+  }
+  arr.forEach(c => {
+    const relData = RELATIONS[c.relation || 'romantic'] || RELATIONS.romantic;
+    const active = c.id === activeId;
+    const row = document.createElement('div');
+    row.className = 'conn-item';
+    // icon
+    const ico = document.createElement('span');
+    ico.style.fontSize = '20px'; ico.textContent = relData.icon; row.appendChild(ico);
+    // text
+    const txt2 = document.createElement('div');
+    txt2.style.flex = '1';
+    const nm = document.createElement('div');
+    nm.style.cssText = 'font-family:var(--hand);font-size:15px;font-weight:700;color:var(--txt)';
+    nm.textContent = c.partnerName ? c.myName + ' & ' + c.partnerName : c.myName;
+    const rm = document.createElement('div');
+    rm.style.cssText = 'font-family:var(--sans);font-size:11px;color:var(--txt2)';
+    rm.textContent = 'Room: ' + c.room + (active ? ' · active' : '');
+    txt2.appendChild(nm); txt2.appendChild(rm); row.appendChild(txt2);
+    // actions
+    if (active) {
+      const sp = document.createElement('span');
+      sp.style.cssText = 'font-family:var(--hand);font-size:11px;color:var(--ac);font-weight:700';
+      sp.textContent = 'NOW'; row.appendChild(sp);
+    } else {
+      const sw = document.createElement('button');
+      sw.className = 'sett-btn'; sw.textContent = 'Switch';
+      sw.addEventListener('click', () => switchConn(c.id));
+      row.appendChild(sw);
+    }
+    const del = document.createElement('button');
+    del.style.cssText = 'background:none;border:none;color:rgba(180,50,50,.4);font-size:18px;cursor:pointer;padding:0 4px;margin-inline-start:6px';
+    del.textContent = '×';
+    del.addEventListener('click', () => deleteConn(c.id));
+    row.appendChild(del);
+    container.appendChild(row);
+  });
+}
+function switchConn(id) {
+  S.s('activeConn', id);
+  const c = getConns().find(x => x.id === id);
+  if (!c) return;
+  S.s('userId', c.userId); S.s('room', c.room);
+  S.s('userName', c.myName); S.s('partnerName', c.partnerName || '');
+  S.s('relation', c.relation || 'romantic');
+  rel = c.relation || 'romantic';
+  loadEmos(); updateAC(RELATIONS[rel].ac);
+  loadMoments(); enterApp();
+}
+function deleteConn(id) {
+  if (!confirm('Remove this connection?')) return;
+  let arr = getConns().filter(c => c.id !== id);
+  saveConns(arr);
+  if (arr.length) { switchConn(arr[0].id); }
+  else { localStorage.clear(); location.reload(); }
+}
+
+// ════════════════════════════════════════════════
+// MQTT
+// ════════════════════════════════════════════════
+function connectMQTT(cb) {
+  if (typeof mqtt === 'undefined') { setTimeout(() => connectMQTT(cb), 300); return; }
+  const cid = 'pulse_' + uid();
+  const brokers = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt'];
+  let bi = 0;
+  function tryBroker() {
+    mq = mqtt.connect(brokers[bi % brokers.length], {clientId:cid,clean:true,connectTimeout:8000,reconnectPeriod:4000,keepalive:25});
+    mq.on('connect', () => { mqOk = true; setConn(true); if (cb) { cb(); cb = null; } });
+    mq.on('error',   () => setConn(false));
+    mq.on('close',   () => { mqOk = false; setConn(false); });
+    mq.on('reconnect', () => { bi++; setConn(false); });
+  }
+  tryBroker();
+}
+function setConn(ok) {
+  const d = el('conn-dot'), t = el('conn-txt');
+  if (d) d.style.background = ok ? '#60A850' : '#bbb';
+  if (t) t.textContent = ok ? 'connected' : 'offline';
+}
+function pub(room, payload) {
+  return new Promise((res, rej) => {
+    if (!mq || !mqOk) { rej(new Error('offline')); return; }
+    const str = JSON.stringify(payload);
+    mq.publish(topic(room), str, {qos:1}, err => {
+      if (!err) { res(); return; }
+      setTimeout(() => { if (mq && mqOk) mq.publish(topic(room), str, {qos:1}, e2 => e2 ? rej(e2) : res()); else rej(err); }, 1500);
+    });
+  });
+}
+
+// ════════════════════════════════════════════════
+// MQTT MESSAGE HANDLER
+// ════════════════════════════════════════════════
+function onMqMsg(t, buf) {
+  let d; try { d = JSON.parse(buf.toString()); } catch(e) { return; }
+  const room = S.g('room'), myId = S.g('userId');
+
+  // Join notification (someone joined my room)
+  if (t === jtopic(room)) {
+    if (d.type === 'join' && d.userId !== myId) {
+      S.s('partnerName', d.name);
+      updateConnPartner(room, d.name);
+      const wp = el('wait-puppy');
+      if (wp) wp.className = 'anim-bounce';
+      setTimeout(() => enterApp(), 700);
+    }
+    return;
+  }
+
+  // History sync
+  if (t === htopic(room)) {
+    try {
+      const remote = JSON.parse(buf.toString());
+      if (Array.isArray(remote) && remote.length > moments.length) {
+        moments = remote; saveMoments(); renderHistory();
+      }
+    } catch(e) {}
+    return;
+  }
+
+  // Regular message
+  if (t !== topic(room)) return;
+  if (d.from === myId) return;
+  if (d.ts < Date.now() - 5000) return;
+
+  // Sound
+  if (d.type === 'sound') {
+    playSound(d.soundKey);
+    toast((SOUNDS_DATA[d.soundKey]?.emoji || '🎵') + ' ' + (d.fromName || ''));
+    return;
+  }
+
+  // Emotion
+  const emo = emos.find(e => e.key === d.emotion) || emos[0];
+  if (!emo) return;
+  const moment = {emo: {key:emo.key,sym:emo.sym,name:emo.name,ac:emo.ac}, msg:d.msg, from:d.fromName||'them', ts:d.ts, mine:false};
+  moments.unshift(moment);
+  saveMoments(); pubHistory(); renderHistory();
+  showReceive(emo, d.msg, d.fromName);
+}
+
+// ════════════════════════════════════════════════
+// ENTER APP
+// ════════════════════════════════════════════════
+function enterApp() {
+  const pn = S.g('partnerName') || '';
+  const r = S.g('relation') || 'romantic';
+  rel = r; loadEmos();
+  updateAC(RELATIONS[rel].ac);
+  txt('to-lbl', pn ? L().toLbl.replace('my love', pn).replace('לאהוב שלי','→ ' + pn).replace('моему любимому','→ ' + pn).replace('إلى حبيبي','→ ' + pn) : L().toLbl);
+  eIdx = 0; selMsg = null;
+  loadMoments();
+  renderPuppySend();
+  updateEmoUI();
+  renderHistory();
+  renderConns();
+  updateAnimalDisplay();
+  subRoom();
+  show('s-send');
+  updateNavTab('send');
+  setTimeout(askNotif, 2000);
+  if (/iphone|ipad|ipod/i.test(navigator.userAgent) && !navigator.standalone)
+    setTimeout(() => el('ios-banner').classList.add('show'), 4000);
+}
+function subRoom() {
+  const room = S.g('room');
+  if (!room || !mq) return;
+  mq.subscribe(topic(room), {qos:1});
+  mq.subscribe(htopic(room), {qos:1});
+  mq.removeAllListeners('message');
+  mq.on('message', onMqMsg);
+}
+
+// ════════════════════════════════════════════════
+// PUPPY RENDER
+// ════════════════════════════════════════════════
+const DOG_SVG_SM = `<svg width="88" height="100" viewBox="0 0 100 113" fill="none"><ellipse cx="26" cy="37" rx="13.5" ry="21" fill="#B87050" transform="rotate(-18 26 37)"/><ellipse cx="26" cy="39" rx="7.5" ry="13" fill="#DFA880" transform="rotate(-18 26 39)"/><ellipse cx="74" cy="37" rx="13.5" ry="21" fill="#B87050" transform="rotate(18 74 37)"/><ellipse cx="74" cy="39" rx="7.5" ry="13" fill="#DFA880" transform="rotate(18 74 39)"/><circle cx="50" cy="55" r="28" fill="#D8A87A"/><ellipse cx="50" cy="43" rx="16" ry="10" fill="#C4896A" opacity=".32"/><circle cx="40" cy="52" r="5.2" fill="#1C0C06"/><circle cx="41.8" cy="50.2" r="2.1" fill="white" opacity=".88"/><circle cx="60" cy="52" r="5.2" fill="#1C0C06"/><circle cx="61.8" cy="50.2" r="2.1" fill="white" opacity=".88"/><circle cx="32" cy="60" r="7" fill="#F09898" opacity=".2"/><circle cx="68" cy="60" r="7" fill="#F09898" opacity=".2"/><ellipse cx="50" cy="61.5" rx="4.8" ry="3.2" fill="#1C0C06"/><ellipse cx="48.6" cy="60.4" rx="1.6" ry="1.1" fill="white" opacity=".34"/><path d="M44 67Q50 73 56 67" stroke="#1C0C06" stroke-width="1.6" stroke-linecap="round" fill="none"/><ellipse cx="50" cy="96" rx="20" ry="14" fill="#D8A87A"/><path d="M68 91Q86 77 79 63" stroke="#C4896A" stroke-width="9.5" stroke-linecap="round" fill="none" id="tail-send"/><ellipse cx="37" cy="108" rx="8.5" ry="5.5" fill="#C4896A"/><ellipse cx="63" cy="108" rx="8.5" ry="5.5" fill="#C4896A"/></svg>`;
+
+function renderPuppySend() {
+  const wrap = el('send-puppy-wrap'); if (!wrap) return;
+  const key = S.g('animalKey') || 'dog';
+  const anim = emos[eIdx] ? (['anim-float','anim-tilt','anim-breathe','anim-bounce'][eIdx % 4]) : 'anim-float';
+  if (key === 'dog') {
+    wrap.innerHTML = `<div class="${anim}">${DOG_SVG_SM}</div>`;
+  } else {
+    const a = ANIMALS[key] || ANIMALS.dog;
+    wrap.innerHTML = `<div class="${anim}" style="font-size:76px;width:88px;height:100px;display:flex;align-items:center;justify-content:center">${a.emoji}</div>`;
+  }
+}
+function updateRcvPuppy() {
+  const key = S.g('animalKey') || 'dog';
+  const rcvp = el('rcv-puppy');
+  if (!rcvp) return;
+  if (key !== 'dog') {
+    const a = ANIMALS[key] || ANIMALS.dog;
+    rcvp.innerHTML = `<div style="font-size:110px;display:flex;align-items:center;justify-content:center;width:130px;height:147px">${a.emoji}</div>`;
+  }
+}
+
+// ════════════════════════════════════════════════
+// EMOTION UI
+// ════════════════════════════════════════════════
+function prevEmo() { eIdx = (eIdx - 1 + emos.length) % emos.length; selMsg = null; updateEmoUI(); }
+function nextEmo() { eIdx = (eIdx + 1) % emos.length;               selMsg = null; updateEmoUI(); }
+function updateEmoUI() {
+  if (!emos.length) return;
+  const e = emos[eIdx];
+  document.documentElement.style.setProperty('--ac', e.ac);
+  document.documentElement.style.setProperty('--chip', e.ac + '44');
+  txt('emo-sym', e.sym); el('emo-sym').style.color = e.ac;
+  txt('emo-name', e.name); el('emo-name').style.color = e.ac;
+  const sb = el('send-btn');
+  sb.textContent = e.sym; sb.style.color = e.ac;
+  sb.style.borderColor = e.ac + '44';
+  sb.style.boxShadow = `0 10px 40px ${e.ac}22`;
+  el('ripple').style.borderColor = e.ac;
+  txt('to-lbl', L().toLbl); el('to-lbl').style.color = e.ac;
+  // Nav active color
+  el('nav-s-i').style.color = e.ac; el('nav-s-l').style.color = e.ac;
+  // Puppy anim
+  renderPuppySend();
+  buildMsgOpts();
+}
+function buildMsgOpts() {
+  const c = el('msg-opts'); if (!c || !emos[eIdx]) return;
+  const e = emos[eIdx];
+  c.innerHTML = '';
+  (e.msgs || []).forEach(m => {
+    const b = document.createElement('button');
+    b.className = 'msg-chip' + (selMsg === m ? ' on' : '');
+    b.textContent = m;
+    b.addEventListener('click', () => { selMsg = selMsg === m ? null : m; el('msg-custom').value = ''; buildMsgOpts(); });
+    c.appendChild(b);
+  });
+}
+
+// ════════════════════════════════════════════════
+// SEND
+// ════════════════════════════════════════════════
+async function sendMoment() {
+  const e = emos[eIdx];
+  const custom = (el('msg-custom').value || '').trim();
+  const msg = custom || selMsg || (e.msgs && e.msgs[0]) || '';
+  const btn = el('send-btn');
+  btn.classList.add('sending');
+  txt('tap-hint', L().sending);
+  fireRipple(); spawnParticles(e);
+  if (settings.vibe && navigator.vibrate) navigator.vibrate(e.vibe || [60]);
+  try {
+    await pub(S.g('room'), {emotion:e.key, msg, from:S.g('userId'), fromName:S.g('userName'), ts:Date.now()});
+    const moment = {emo:{key:e.key,sym:e.sym,name:e.name,ac:e.ac}, msg, from:'me', ts:Date.now(), mine:true};
+    moments.unshift(moment);
+    saveMoments(); pubHistory(); renderHistory();
+    el('msg-custom').value = ''; selMsg = null; buildMsgOpts();
+    toast(e.sym + ' ' + L().tapHint.replace('tap to send','Sent!').replace('לחץ לשליחה','נשלח!').replace('нажмите для отправки','Отправлено!').replace('اضغط للإرسال','أُرسل!'));
+  } catch(err) { toast(L().notConnected); }
+  finally {
+    setTimeout(() => { btn.classList.remove('sending'); txt('tap-hint', L().tapHint); }, 850);
+  }
+}
+
+// ════════════════════════════════════════════════
+// ANIMATIONS
+// ════════════════════════════════════════════════
+function fireRipple() {
+  const r = el('ripple');
+  r.classList.remove('fire'); void r.offsetWidth; r.classList.add('fire');
+}
+function spawnParticles(e) {
+  const c = el('particles'); c.innerHTML = '';
+  for (let i = 0; i < 7; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle'; p.textContent = e.sym;
+    p.style.color = e.ac;
+    p.style.left = (20 + Math.random() * 60) + '%';
+    p.style.bottom = '44%';
+    p.style.animationDelay = (i * 0.09) + 's';
+    c.appendChild(p);
+  }
+  setTimeout(() => c.innerHTML = '', 1300);
+}
+
+// ════════════════════════════════════════════════
+// RECEIVE
+// ════════════════════════════════════════════════
+function showReceive(emo, msg, fromName) {
+  const s = el('s-receive');
+  s.style.background = `linear-gradient(160deg,${emo.ac}18,#F5E6CF)`;
+  txt('rcv-from', L().fromPerson.replace('my person', fromName || 'my person'));
+  el('rcv-from').style.color = emo.ac;
+  txt('rcv-sym', emo.sym); el('rcv-sym').style.color = emo.ac;
+  txt('rcv-name', emo.name); el('rcv-name').style.color = emo.ac;
+  txt('rcv-msg', '"' + msg + '"');
+  updateRcvBtn(emo);
+  updateRcvPuppy();
+  if (settings.vibe && navigator.vibrate) navigator.vibrate(emo.vibe || [60]);
+  if (Notification.permission === 'granted' && document.visibilityState !== 'visible') {
+    try { new Notification((fromName || L().fromPerson) + ' — ' + emo.name, {body:'"'+msg+'"',tag:'pulse',renotify:true}); } catch(e) {}
+  }
+  s.classList.add('show');
+}
+function updateRcvBtn(emo) {
+  const btn = el('rcv-reply-btn'); if (!btn) return;
+  const e = emo || emos[eIdx];
+  btn.textContent = L().replyBtn + (e ? ' ' + e.sym : ' ♡');
+  if (e) { btn.style.background = `linear-gradient(135deg,${e.ac},${e.ac}99)`; btn.style.boxShadow = `0 8px 24px ${e.ac}44`; }
+}
+function closeReceive() { el('s-receive').classList.remove('show'); }
+
+// ════════════════════════════════════════════════
+// HISTORY
+// ════════════════════════════════════════════════
+function saveMoments() { try { localStorage.setItem('px_hist', JSON.stringify(moments.slice(0,80))); } catch(e) {} }
+function loadMoments() { try { const d = JSON.parse(localStorage.getItem('px_hist') || '[]'); moments = Array.isArray(d) ? d : []; } catch(e) { moments = []; } }
+function pubHistory() {
+  if (!mq || !mqOk || !S.g('room')) return;
+  mq.publish(htopic(S.g('room')), JSON.stringify(moments.slice(0,80)), {qos:1,retain:true});
+}
+function renderHistory() {
+  const c = el('hist-list'); if (!c) return;
+  if (!moments.length) {
+    c.innerHTML = `<div class="empty" id="hist-empty">${L().histEmpty.replace('\n','<br>')}</div>`;
+    return;
+  }
+  c.innerHTML = moments.slice(0,50).map((m, i) => {
+    const emo = m.emo || {};
+    const fromTxt = m.mine ? L().youSent : (m.from || 'them') + ' ' + L().theySent;
+    return `<div class="hist-card" style="animation-delay:${i*.04}s">
+      <div class="hist-ico" style="background:${emo.ac||'#8B5E3C'}16;color:${emo.ac||'#8B5E3C'}">${emo.sym||'♡'}</div>
+      <div style="flex:1;min-width:0">
+        <div class="hist-name" style="color:${emo.ac||'#8B5E3C'}">${emo.name||''}</div>
+        <div class="hist-msg">"${m.msg||''}"</div>
+        <div class="hist-from">${fromTxt}</div>
+      </div>
+      <div class="hist-time">${fmtTime(m.ts)}</div>
+    </div>`;
+  }).join('');
+}
+function fmtTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts), now = new Date(), diff = now - d;
+  if (diff < 60000) return L().justNow;
+  if (diff < 3600000) return Math.floor(diff / 60000) + 'm';
+  if (diff < 86400000) return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  if (diff < 172800000) return L().yesterday;
+  return d.toLocaleDateString([], {month:'short',day:'numeric'});
+}
+
+// ════════════════════════════════════════════════
+// SETTINGS
+// ════════════════════════════════════════════════
+function goTab(tab) {
+  const map = {history:'s-history', send:'s-send', settings:'s-settings'};
+  show(map[tab] || 's-send');
+  updateNavTab(tab);
+  if (tab === 'settings') { renderConns(); updateAnimalDisplay(); }
+}
+function updateNavTab(tab) {
+  const navItems = [
+    ['nav-h-i','nav-h-l','history'],['nav-s-i','nav-s-l','send'],['nav-g-i','nav-g-l','settings'],
+    ['nav-hh-i','nav-hh-l','history'],['nav-hs-i','nav-hs-l','send'],['nav-hg-i','nav-hg-l','settings'],
+    ['nav-gh-i','nav-gh-l','history'],['nav-gs-i','nav-gs-l','send'],['nav-gg-i','nav-gg-l','settings'],
+  ];
+  navItems.forEach(([iconId, labelId, t]) => {
+    const active = t === tab;
+    const ac = emos[eIdx] ? emos[eIdx].ac : '#8B5E3C';
+    const color = active ? ac : 'rgba(139,94,60,.28)';
+    const iconEl = el(iconId); if (iconEl) iconEl.style.color = color;
+    const labelEl = el(labelId); if (labelEl) labelEl.style.color = color;
+  });
+}
+function toggleSetting(key, btn) {
+  settings[key] = !settings[key];
+  btn.style.background = settings[key] ? 'var(--ac)' : 'rgba(139,94,60,.15)';
+  const thumb = btn.querySelector('.tog-thumb');
+  if (thumb) thumb.style.insetInlineStart = settings[key] ? '24px' : '3px';
+}
+async function askNotif() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') return;
+  const p = await Notification.requestPermission();
+  if (p === 'granted') toast(L().notifOn);
+}
+function resetAll() {
+  if (!confirm(L().resetBtn + '?')) return;
+  localStorage.clear(); sessionStorage.clear();
+  location.href = location.href.split('?')[0] + '?r=' + Date.now();
+}
+
+// ════════════════════════════════════════════════
+// ANIMAL
+// ════════════════════════════════════════════════
+function animalKey()  { return S.g('animalKey') || 'dog'; }
+function animalName() {
+  const saved = S.g('animalName'); if (saved) return saved;
+  const a = ANIMALS[animalKey()] || ANIMALS.dog;
+  return a[lang] || a.en;
+}
+function updateAnimalDisplay() {
+  const a = ANIMALS[animalKey()] || ANIMALS.dog;
+  txt('animal-emoji', a.emoji);
+  txt('animal-name-d', animalName());
+  txt('animal-type-d', a[lang] || a.en);
+}
+function openAnimalPicker() {
+  const l = L();
+  const curKey = animalKey();
+  const div = document.createElement('div');
+  div.className = 'modal-bg';
+  div.addEventListener('click', e => { if (e.target === div) closeModal(); });
+  const card = document.createElement('div');
+  card.className = 'modal';
+  card.innerHTML = `<h3>${l.animalTitle}</h3>`;
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:18px';
+  Object.entries(ANIMALS).forEach(([k,a]) => {
+    const btn = document.createElement('button');
+    btn.style.cssText = `background:${k===curKey?'rgba(139,94,60,.12)':'rgba(255,255,255,.6)'};border:1.5px solid ${k===curKey?'var(--ac)':'var(--border)'};border-radius:14px;padding:12px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:all .18s`;
+    btn.innerHTML = `<span style="font-size:30px">${a.emoji}</span><span style="font-family:var(--hand);font-size:12px;color:var(--txt)">${a[lang]||a.en}</span>`;
+    btn.addEventListener('click', () => {
+      grid.querySelectorAll('button').forEach(b => { b.style.background='rgba(255,255,255,.6)'; b.style.borderColor='var(--border)'; });
+      btn.style.background='rgba(139,94,60,.12)'; btn.style.borderColor='var(--ac)';
+      S.s('animalKey', k); S.d('animalName');
+    });
+    grid.appendChild(btn);
+  });
+  card.appendChild(grid);
+  const nameLabel = document.createElement('p');
+  nameLabel.style.cssText = 'font-family:var(--sans);font-size:12px;color:var(--txt2);margin-bottom:8px';
+  nameLabel.textContent = l.animalName;
+  card.appendChild(nameLabel);
+  const nameInp = document.createElement('input');
+  nameInp.className = 'field'; nameInp.style.marginBottom = '16px';
+  nameInp.value = animalName(); nameInp.maxLength = 20;
+  card.appendChild(nameInp);
+  const btns = document.createElement('div');
+  btns.style.cssText = 'display:flex;gap:10px';
+  const save = document.createElement('button'); save.className = 'btn'; save.textContent = l.animalSave;
+  save.addEventListener('click', () => { if (nameInp.value.trim()) S.s('animalName', nameInp.value.trim()); updateAnimalDisplay(); renderPuppySend(); closeModal(); toast((ANIMALS[animalKey()]||ANIMALS.dog).emoji + ' ' + animalName()); });
+  const cancel = document.createElement('button'); cancel.className = 'btn btn-ghost'; cancel.textContent = l.animalCancel;
+  cancel.addEventListener('click', closeModal);
+  btns.appendChild(cancel); btns.appendChild(save);
+  card.appendChild(btns);
+  div.appendChild(card);
+  el('modal-root').appendChild(div);
+}
+
+// ════════════════════════════════════════════════
+// SOUNDS
+// ════════════════════════════════════════════════
+const SOUNDS_DATA = {
+  fart: {emoji:'💨',en:'Fart',  he:'פלוץ', ru:'Пук',     ar:'ضرطة'},
+  duck: {emoji:'🦆',en:'Duck',  he:'ברווז',ru:'Утка',    ar:'بطة'},
+  cat:  {emoji:'🐱',en:'Cat',   he:'חתול', ru:'Кошка',   ar:'قطة'},
+  kiss: {emoji:'💋',en:'Kiss',  he:'נשיקה',ru:'Поцелуй', ar:'قبلة'},
+  laugh:{emoji:'😂',en:'LOL',   he:'LOL',  ru:'Хаха',    ar:'هههه'},
+  boing:{emoji:'🎵',en:'Boing', he:'בוינג',ru:'Бум',     ar:'بوينغ'},
+  bell: {emoji:'🔔',en:'Bell',  he:'פעמון',ru:'Звонок',  ar:'جرس'},
+  wow:  {emoji:'🤩',en:'Wow',   he:'וואו', ru:'Вау',     ar:'واو'},
+};
+function playSound(key) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const synths = {
+      fart:  c => { const o=c.createOscillator(),g=c.createGain(),b=c.createBuffer(1,c.sampleRate*.45,c.sampleRate),d=b.getChannelData(0),n=c.createBufferSource(),ng=c.createGain(); for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*.4; o.type='sawtooth';o.frequency.setValueAtTime(110,c.currentTime);o.frequency.exponentialRampToValueAtTime(35,c.currentTime+.45); o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.7,c.currentTime);g.gain.exponentialRampToValueAtTime(.01,c.currentTime+.5); n.buffer=b;n.connect(ng);ng.connect(c.destination);ng.gain.setValueAtTime(.45,c.currentTime);ng.gain.exponentialRampToValueAtTime(.01,c.currentTime+.45); o.start();o.stop(c.currentTime+.5);n.start();n.stop(c.currentTime+.45); },
+      duck:  c => { const o=c.createOscillator(),g=c.createGain(); o.type='square';[0,.08,.16,.24].forEach((t,i)=>o.frequency.setValueAtTime(i%2?480:350,c.currentTime+t)); o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.5,c.currentTime);g.gain.exponentialRampToValueAtTime(.01,c.currentTime+.35); o.start();o.stop(c.currentTime+.35); },
+      cat:   c => { const o=c.createOscillator(),g=c.createGain(); o.type='sine';o.frequency.setValueAtTime(480,c.currentTime);o.frequency.exponentialRampToValueAtTime(920,c.currentTime+.18);o.frequency.exponentialRampToValueAtTime(560,c.currentTime+.55); o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.55,c.currentTime);g.gain.exponentialRampToValueAtTime(.01,c.currentTime+.62); o.start();o.stop(c.currentTime+.62); },
+      kiss:  c => { const o=c.createOscillator(),g=c.createGain(),o2=c.createOscillator(),g2=c.createGain(); o.type='sine';o.frequency.setValueAtTime(1400,c.currentTime);o.frequency.exponentialRampToValueAtTime(700,c.currentTime+.12); o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.32,c.currentTime);g.gain.exponentialRampToValueAtTime(.01,c.currentTime+.15); o2.type='sine';o2.frequency.value=580;o2.connect(g2);g2.connect(c.destination);g2.gain.setValueAtTime(.45,c.currentTime+.1);g2.gain.exponentialRampToValueAtTime(.01,c.currentTime+.22); o.start();o.stop(c.currentTime+.15);o2.start(c.currentTime+.1);o2.stop(c.currentTime+.22); },
+      laugh: c => { [0,.1,.2,.3,.4,.5].forEach(t=>{ const o=c.createOscillator(),g=c.createGain(); o.type='sine';o.frequency.setValueAtTime(720+t*70,c.currentTime+t);o.frequency.exponentialRampToValueAtTime(450,c.currentTime+t+.09); o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.28,c.currentTime+t);g.gain.exponentialRampToValueAtTime(.01,c.currentTime+t+.1); o.start(c.currentTime+t);o.stop(c.currentTime+t+.1); }); },
+      boing: c => { const o=c.createOscillator(),g=c.createGain(); o.type='sine';o.frequency.setValueAtTime(900,c.currentTime);o.frequency.exponentialRampToValueAtTime(130,c.currentTime+.58); o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.65,c.currentTime);g.gain.exponentialRampToValueAtTime(.01,c.currentTime+.6); o.start();o.stop(c.currentTime+.6); },
+      bell:  c => { const o=c.createOscillator(),g=c.createGain(),o2=c.createOscillator(),g2=c.createGain(); o.type='sine';o.frequency.value=1760;o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.45,c.currentTime);g.gain.exponentialRampToValueAtTime(.01,c.currentTime+.65); o2.type='sine';o2.frequency.value=2220;o2.connect(g2);g2.connect(c.destination);g2.gain.setValueAtTime(.25,c.currentTime+.04);g2.gain.exponentialRampToValueAtTime(.01,c.currentTime+.55); o.start();o.stop(c.currentTime+.65);o2.start(c.currentTime+.04);o2.stop(c.currentTime+.55); },
+      wow:   c => { [523,659,784,1047].forEach((f,i)=>{ const o=c.createOscillator(),g=c.createGain(); o.type='sine';o.frequency.value=f;o.connect(g);g.connect(c.destination);g.gain.setValueAtTime(.42,c.currentTime+i*.09);g.gain.exponentialRampToValueAtTime(.01,c.currentTime+i*.09+.09); o.start(c.currentTime+i*.09);o.stop(c.currentTime+i*.09+.09); }); },
+    };
+    (synths[key] || synths.boing)(ctx);
+  } catch(e) { console.warn('sound error', e); }
+}
+function openSounds() {
+  const l = L();
+  const div = document.createElement('div');
+  div.className = 'modal-bg';
+  div.addEventListener('click', e => { if (e.target === div) closeModal(); });
+  const card = document.createElement('div'); card.className = 'modal';
+  card.innerHTML = `<h3>${l.soundTitle}</h3>`;
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:16px';
+  Object.entries(SOUNDS_DATA).forEach(([key, s]) => {
+    const btn = document.createElement('button');
+    btn.style.cssText = 'background:rgba(255,255,255,.62);border:1.5px solid var(--border);border-radius:14px;padding:12px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;transition:all .18s';
+    btn.innerHTML = `<span style="font-size:28px">${s.emoji}</span><span style="font-family:var(--hand);font-size:12px;color:var(--txt);font-weight:600">${s[lang]||s.en}</span>`;
+    btn.addEventListener('click', () => {
+      playSound(key);
+      setTimeout(async () => {
+        try { await pub(S.g('room'), {type:'sound',soundKey:key,from:S.g('userId'),fromName:S.g('userName'),ts:Date.now()}); toast(s.emoji + ' Sent!'); }
+        catch(e) { toast(l.notConnected); }
+      }, 150);
+      closeModal();
+    });
+    grid.appendChild(btn);
+  });
+  card.appendChild(grid);
+  const cancel = document.createElement('button'); cancel.className = 'btn btn-ghost'; cancel.textContent = l.soundCancel;
+  cancel.style.marginTop = '4px';
+  cancel.addEventListener('click', closeModal);
+  card.appendChild(cancel);
+  div.appendChild(card);
+  el('modal-root').appendChild(div);
+}
+function closeModal() { el('modal-root').innerHTML = ''; }
+
+// ════════════════════════════════════════════════
+// MISC
+// ════════════════════════════════════════════════
+function tap5() {
+  _logoTaps++;
+  clearTimeout(_logoTimer);
+  if (_logoTaps >= 5) { _logoTaps = 0; resetAll(); }
+  else _logoTimer = setTimeout(() => _logoTaps = 0, 1400);
+}
+
+// ════════════════════════════════════════════════
+// BOOT
+// ════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  animTails();
+
+  // Keep alive
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && !mqOk && mq) try { mq.reconnect(); } catch(e) {}
+  });
+  setInterval(() => { if (mq && mqOk && S.g('room')) try { mq.publish('pulse/ping/' + (S.g('userId')||'x'), '1', {qos:0}); } catch(e) {} }, 22000);
+
+  // Clear and start fresh
+  localStorage.clear();
+  lang = 'en';
+  applyLang();
+  renderBullets();
+
+  // Show lang screen immediately — don't wait for MQTT
+  el('loading').style.display = 'none';
+  show('s-lang');
+
+  // Load MQTT in background
+  function loadMQTTScript(urls, i) {
+    if (i >= urls.length) return;
+    var s = document.createElement('script');
+    s.src = urls[i];
+    s.onerror = function() { loadMQTTScript(urls, i+1); };
+    s.onload = function() { connectMQTT(function() { setConn(true); }); };
+    document.head.appendChild(s);
+  }
+  loadMQTTScript([
+    'https://cdn.jsdelivr.net/npm/mqtt@5.3.4/dist/mqtt.min.js',
+    'https://unpkg.com/mqtt@5.3.4/dist/mqtt.min.js'
+  ], 0);
+});
+</script>
+</body>
+</html>
