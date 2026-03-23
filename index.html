@@ -919,6 +919,56 @@ let curLang='en', curRel=null, curEMs=[], moments=[];
 let customEMs={};  // per-user custom emotions: stored in localStorage + MQTT topic
 let obStep=0;
 
+// ═══ PUSH NOTIFICATIONS CONFIG ═══
+// Set this to your Cloudflare Worker URL after deploying push-server/
+// Example: 'https://pulse-push.yourname.workers.dev'
+var PUSH_SERVER = '';
+var VAPID_PUBLIC_KEY = 'BB1SPfVQ61sJ6rnISO6icswRRYBaMXBblyxB_hqv6lWex0SjidQn0Nxd_EJQMa4J3s6BG2fXqKUD-CuUDkKK3zc';
+
+// Subscribe to Web Push notifications (called after entering app)
+async function subscribePush(){
+  if(!PUSH_SERVER)return;
+  if(!('serviceWorker'in navigator)||!('PushManager'in window))return;
+  try{
+    var reg=await navigator.serviceWorker.ready;
+    var sub=await reg.pushManager.getSubscription();
+    if(!sub){
+      // Convert VAPID key from base64url to Uint8Array
+      var padding='='.repeat((4-VAPID_PUBLIC_KEY.length%4)%4);
+      var b64=VAPID_PUBLIC_KEY.replace(/-/g,'+').replace(/_/g,'/')+padding;
+      var raw=atob(b64);
+      var arr=new Uint8Array(raw.length);
+      for(var i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);
+
+      sub=await reg.pushManager.subscribe({
+        userVisibleOnly:true,
+        applicationServerKey:arr
+      });
+    }
+    // Register subscription with push server for this room
+    var room=S.g('room');
+    if(room&&sub){
+      fetch(PUSH_SERVER+'/subscribe',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({room:room,subscription:sub.toJSON()})
+      }).catch(function(){});
+    }
+  }catch(e){console.log('[Push] Subscribe error:',e)}
+}
+
+// Send push notification via server (for when partner's browser is closed)
+function sendPushNotif(title,body,icon){
+  if(!PUSH_SERVER)return;
+  var room=S.g('room');
+  if(!room)return;
+  fetch(PUSH_SERVER+'/notify',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({room:room,title:title,body:body,icon:icon||'♡',senderId:S.g('userId')})
+  }).catch(function(){});
+}
+
 const S={g:k=>localStorage.getItem('px_'+k),s:(k,v)=>localStorage.setItem('px_'+k,v),d:k=>localStorage.removeItem('px_'+k)};
 const uid=()=>Math.random().toString(36).slice(2,12);
 const mkCode=()=>{const a='ABCDEFGHJKLMNPQRSTUVWXYZ';return Array.from({length:6},()=>a[Math.floor(Math.random()*a.length)]).join('')};
@@ -1347,6 +1397,7 @@ function enterApp(){
   subRoom();
   goScreen('send');eIdx=0;updateEmUI();buildVG();renderHistory();
   setTimeout(askNotif,2000);
+  setTimeout(subscribePush,3000);
   updateAnimalUI();
   // Init tree for romantic couples
   if((S.g('relation')||'romantic')==='romantic')initTree();
@@ -1431,6 +1482,8 @@ async function sendMoment(){
     moments.unshift({em:{key:e.key,name:e.name,sym:e.sym,ac:e.ac,chip:e.chip,grad:e.grad,anim:e.anim},msg,from:'me',ts:Date.now(),mine:true});
     saveMoments();publishHistory();renderHistory();
     toast(`${e.sym} ${T().sentTo} ${S.g('partnerName')||''}`);
+    // Also send push notification (reaches partner even if browser is closed)
+    sendPushNotif((S.g('userName')||'Someone')+' — '+e.name+' '+e.sym,'"'+msg+'"',e.sym);
     document.getElementById('cmsg').value='';selMsg=null;buildMsgOpts(e);
   }catch(err){toast(T().notConnected)}
   finally{setTimeout(()=>{btn.classList.remove('go');document.getElementById('taphint').textContent=T().tapHint},900)}
@@ -2043,6 +2096,8 @@ async function sendSound(soundKey){
   var s=SOUNDS[soundKey];if(!s)return;
   try{
     await pub(room,{type:'sound',soundKey:soundKey,from:S.g('userId'),fromName:S.g('userName'),ts:Date.now()});
+    var sname={en:s.nameEn,he:s.nameHe,ru:s.nameRu,ar:s.nameAr}[curLang]||s.nameEn;
+    sendPushNotif((S.g('userName')||'Someone')+' '+s.emoji,sname,s.emoji);
     toast(s.emoji+' Sent!');
   }catch(e){toast(T().notConnected)}
 }

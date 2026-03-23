@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pulse-v32';
+const CACHE_NAME = 'pulse-v33';
 const ASSETS = [
   './',
   './index.html',
@@ -6,7 +6,6 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', e => {
-  // Force activate immediately — don't wait for old tabs to close
   self.skipWaiting();
   e.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
@@ -14,7 +13,6 @@ self.addEventListener('install', e => {
 });
 
 self.addEventListener('activate', e => {
-  // Delete ALL old caches immediately
   e.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.map(k => {
@@ -28,11 +26,9 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // ALWAYS network-first for HTML — never serve stale HTML
   if (e.request.mode === 'navigate' || e.request.url.endsWith('.html') || e.request.url.endsWith('/')) {
     e.respondWith(
       fetch(e.request).then(resp => {
-        // Cache the fresh copy
         const clone = resp.clone();
         caches.open(CACHE_NAME).then(c => c.put(e.request, clone));
         return resp;
@@ -40,7 +36,6 @@ self.addEventListener('fetch', e => {
     );
     return;
   }
-  // Cache first for other assets
   e.respondWith(
     caches.match(e.request).then(r => r || fetch(e.request).then(resp => {
       if (resp.ok) {
@@ -52,36 +47,63 @@ self.addEventListener('fetch', e => {
   );
 });
 
-// Handle notification clicks — open or focus the app
+// ═══ WEB PUSH — receive push notifications even when browser is closed ═══
+self.addEventListener('push', e => {
+  let data = { title: 'pulse ♡', body: '', icon: '♡' };
+  try {
+    if (e.data) data = e.data.json();
+  } catch (err) {
+    try { data.body = e.data.text(); } catch (e2) {}
+  }
+
+  const options = {
+    body: data.body || '',
+    icon: 'data:image/svg+xml,' + encodeURIComponent(
+      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='#E8D4B4' width='100' height='100' rx='20'/><text x='50' y='68' text-anchor='middle' font-size='52'>" + (data.icon || '♡') + "</text></svg>"
+    ),
+    badge: 'data:image/svg+xml,' + encodeURIComponent(
+      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='#E8D4B4' width='100' height='100' rx='20'/><text x='50' y='68' text-anchor='middle' font-size='52'>♡</text></svg>"
+    ),
+    vibrate: [200, 100, 200, 100, 400],
+    requireInteraction: true,
+    renotify: true,
+    tag: 'pulse-push-' + Date.now(),
+    silent: false,
+    actions: [
+      { action: 'open', title: 'Open' },
+      { action: 'reply', title: '↩ Reply' }
+    ],
+    data: { url: './index.html' }
+  };
+
+  e.waitUntil(
+    self.registration.showNotification(data.title || 'pulse ♡', options)
+  );
+});
+
+// Handle notification clicks
 self.addEventListener('notificationclick', e => {
   const action = e.action;
   e.notification.close();
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
-      // Try to focus an existing window
       for (const client of clients) {
         if (client.url.includes('index.html') || client.url.endsWith('/')) {
           client.focus();
-          // If reply action, tell the page to open reply
           if (action === 'reply') {
             client.postMessage({ type: 'notif-reply' });
           }
           return;
         }
       }
-      // No existing window — open a new one
       const url = (e.notification.data && e.notification.data.url) || './index.html';
       return self.clients.openWindow(url);
     })
   );
 });
 
-// Handle notification close (dismissed without clicking)
-self.addEventListener('notificationclose', e => {
-  // Nothing needed, but prevents errors
-});
+self.addEventListener('notificationclose', e => {});
 
-// Listen for messages from the page
 self.addEventListener('message', e => {
   if (e.data === 'skipWaiting') {
     self.skipWaiting();
