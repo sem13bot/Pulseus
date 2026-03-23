@@ -922,20 +922,45 @@ let obStep=0;
 
 // ═══ PUSH NOTIFICATIONS CONFIG ═══
 var PUSH_SERVER = 'https://pulse-push.semionkh2003.workers.dev';
+var VAPID_PUBLIC_KEY = 'BB1SPfVQ61sJ6rnISO6icswRRYBaMXBblyxB_hqv6lWex0SjidQn0Nxd_EJQMa4J3s6BG2fXqKUD-CuUDkKK3zc';
 
-// Send message via push server (stored + ntfy.sh push notification)
+// Auto-subscribe to Web Push (called on app load)
+async function subscribePush(){
+  if(!PUSH_SERVER||!('serviceWorker'in navigator)||!('PushManager'in window))return;
+  try{
+    var reg=await navigator.serviceWorker.ready;
+    var sub=await reg.pushManager.getSubscription();
+    if(!sub){
+      var padding='='.repeat((4-VAPID_PUBLIC_KEY.length%4)%4);
+      var b64=VAPID_PUBLIC_KEY.replace(/-/g,'+').replace(/_/g,'/')+padding;
+      var raw=atob(b64);var arr=new Uint8Array(raw.length);
+      for(var i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);
+      sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:arr});
+    }
+    var room=S.g('room'),userId=S.g('userId');
+    if(room&&sub){
+      var res=await fetch(PUSH_SERVER+'/subscribe',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({room:room,userId:userId,subscription:sub.toJSON()})
+      });
+      var data=await res.json();
+      console.log('[Push] Subscribed:',data);
+    }
+  }catch(e){console.log('[Push] Subscribe error:',e)}
+}
+
+// Send message via push server (Web Push + ntfy.sh + storage)
 function sendPushNotif(title,body,icon){
   if(!PUSH_SERVER)return;
   var room=S.g('room');
   if(!room)return;
   fetch(PUSH_SERVER+'/send',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
+    method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({room:room,title:title,body:body,icon:icon||'♡',senderId:S.g('userId'),senderName:S.g('userName')})
-  }).catch(function(e){console.log('[Push] Send error:',e)});
+  }).then(function(r){return r.json()}).then(function(d){console.log('[Push] Sent:',d)}).catch(function(e){console.log('[Push] Error:',e)});
 }
 
-// Fetch missed messages from server (called on app load + resume)
+// Fetch missed messages (on app load + resume)
 var _lastFetchTs=0;
 function fetchMissedMessages(){
   if(!PUSH_SERVER)return;
@@ -947,10 +972,7 @@ function fetchMissedMessages(){
     .then(function(data){
       if(data.messages&&data.messages.length>0){
         data.messages.forEach(function(m){
-          // Show each missed message as a notification
-          if(m.senderId!==userId){
-            localNotif({sym:m.icon||'♡',name:m.title||'pulse',ac:'#B04060'},m.body||'',m.senderName||'');
-          }
+          localNotif({sym:m.icon||'♡',name:m.title||'pulse',ac:'#B04060'},m.body||'',m.senderName||'');
         });
         _lastFetchTs=Date.now();
         S.s('lastSeen',String(_lastFetchTs));
@@ -958,23 +980,21 @@ function fetchMissedMessages(){
     }).catch(function(){});
 }
 
-// Subscribe to ntfy.sh for real-time backup delivery via SSE
+// ntfy.sh SSE backup for real-time when app is open
 var _ntfySource=null;
 function connectNtfy(){
-  var room=S.g('room'),userId=S.g('userId');
+  var room=S.g('room');
   if(!room)return;
   if(_ntfySource){try{_ntfySource.close()}catch(e){}}
-  var ntfyTopic='pulse-'+room.toLowerCase();
   try{
-    _ntfySource=new EventSource('https://ntfy.sh/'+ntfyTopic+'/sse');
+    _ntfySource=new EventSource('https://ntfy.sh/pulse-'+room.toLowerCase()+'/sse');
     _ntfySource.onmessage=function(ev){
       try{
         var d=JSON.parse(ev.data);
         if(d.event==='message'&&d.title){
-          // Only show if not from ourselves (check title doesn't start with our name)
           var myName=S.g('userName')||'';
           if(myName&&d.title.startsWith(myName))return;
-          // Show notification
+          if(navigator.vibrate)navigator.vibrate([100,50,100,50,200]);
           if(Notification.permission==='granted'&&document.visibilityState!=='visible'){
             if('serviceWorker'in navigator&&navigator.serviceWorker.controller){
               navigator.serviceWorker.ready.then(function(reg){
@@ -982,14 +1002,10 @@ function connectNtfy(){
               });
             }
           }
-          if(navigator.vibrate)navigator.vibrate([100,50,100,50,200]);
         }
       }catch(e){}
     };
-    _ntfySource.onerror=function(){
-      // Reconnect after 5 seconds
-      setTimeout(function(){connectNtfy()},5000);
-    };
+    _ntfySource.onerror=function(){setTimeout(connectNtfy,5000)};
   }catch(e){}
 }
 
@@ -1421,7 +1437,7 @@ function enterApp(){
   subRoom();
   goScreen('send');eIdx=0;updateEmUI();buildVG();renderHistory();
   setTimeout(askNotif,2000);
-  setTimeout(function(){fetchMissedMessages();connectNtfy()},2000);
+  setTimeout(function(){subscribePush();fetchMissedMessages();connectNtfy()},2000);
   updateAnimalUI();
   // Init tree for romantic couples
   if((S.g('relation')||'romantic')==='romantic')initTree();

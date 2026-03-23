@@ -1,9 +1,11 @@
 name = "pulse-push"
 main = "worker.js"
-compatibility_date = "2024-01-01"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
 
 [vars]
 VAPID_PUBLIC = "BB1SPfVQ61sJ6rnISO6icswRRYBaMXBblyxB_hqv6lWex0SjidQn0Nxd_EJQMa4J3s6BG2fXqKUD-CuUDkKK3zc"
+VAPID_PRIVATE = "Bm5xYhcV7JoCKa7gKiMu0DCSx4IY0OGOTSipoIMUw5c"
 VAPID_SUBJECT = "mailto:pulse@example.com"
 
 [[kv_namespaces]]

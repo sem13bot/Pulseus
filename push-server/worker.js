@@ -1,6 +1,6 @@
-// ═══ Pulse Message Server — Cloudflare Worker ═══
-// Stores messages for offline delivery + sends via ntfy.sh
-// Free tier: 100k requests/day
+// ═══ Pulse Push Server v3 — Cloudflare Worker ═══
+// Web Push (via web-push lib) + ntfy.sh backup + message storage
+import webpush from 'web-push';
 
 export default {
   async fetch(request, env) {
@@ -8,24 +8,78 @@ export default {
       return new Response(null, { headers: corsHeaders() });
     }
 
+    // Configure web-push with VAPID keys
+    webpush.setVapidDetails(
+      env.VAPID_SUBJECT || 'mailto:pulse@example.com',
+      env.VAPID_PUBLIC,
+      env.VAPID_PRIVATE
+    );
+
     const url = new URL(request.url);
 
     try {
-      // POST /send — store message + push via ntfy.sh
+      // POST /subscribe — register push subscription for a room + user
+      if (url.pathname === '/subscribe' && request.method === 'POST') {
+        const { room, userId, subscription } = await request.json();
+        if (!room || !subscription || !subscription.endpoint) {
+          return json({ error: 'missing room or subscription' }, 400);
+        }
+        const key = `subs:${room}`;
+        const existing = JSON.parse(await env.SUBS.get(key) || '[]');
+        // Remove old subscription for same endpoint, then add new
+        const filtered = existing.filter(s => s.endpoint !== subscription.endpoint);
+        filtered.push({ ...subscription, userId: userId || '' });
+        await env.SUBS.put(key, JSON.stringify(filtered));
+        return json({ ok: true, count: filtered.length });
+      }
+
+      // POST /send — store message + send Web Push + ntfy.sh backup
       if (url.pathname === '/send' && request.method === 'POST') {
         const { room, title, body, icon, senderId, senderName } = await request.json();
         if (!room) return json({ error: 'missing room' }, 400);
 
-        // 1. Store message in KV for later retrieval
-        const key = `msg:${room}`;
-        const msgs = JSON.parse(await env.SUBS.get(key) || '[]');
-        const msg = { title, body, icon, senderId, senderName, ts: Date.now() };
-        msgs.push(msg);
-        // Keep last 50 messages, expire after 7 days
-        const recent = msgs.slice(-50);
-        await env.SUBS.put(key, JSON.stringify(recent), { expirationTtl: 604800 });
+        // 1. Store message in KV
+        const msgKey = `msg:${room}`;
+        const msgs = JSON.parse(await env.SUBS.get(msgKey) || '[]');
+        msgs.push({ title, body, icon, senderId, senderName, ts: Date.now() });
+        await env.SUBS.put(msgKey, JSON.stringify(msgs.slice(-50)), { expirationTtl: 604800 });
 
-        // 2. Send push via ntfy.sh (proven, free, works on Android + iOS)
+        // 2. Send Web Push to all subscribers EXCEPT sender
+        const subsKey = `subs:${room}`;
+        const subs = JSON.parse(await env.SUBS.get(subsKey) || '[]');
+        const payload = JSON.stringify({ title: title || 'pulse ♡', body: body || '', icon: icon || '♡' });
+
+        const pushResults = await Promise.allSettled(
+          subs.filter(s => s.userId !== senderId).map(async (sub) => {
+            try {
+              await webpush.sendNotification(
+                { endpoint: sub.endpoint, keys: sub.keys },
+                payload,
+                { TTL: 86400, urgency: 'high' }
+              );
+              return 'sent';
+            } catch (err) {
+              if (err.statusCode === 410 || err.statusCode === 404) {
+                return 'expired';
+              }
+              throw err;
+            }
+          })
+        );
+
+        // Clean up expired subscriptions
+        const validSubs = subs.filter((sub, i) => {
+          if (sub.userId === senderId) return true; // keep sender's sub
+          const idx = subs.filter(s => s.userId !== senderId).indexOf(sub);
+          if (idx === -1) return true;
+          const result = pushResults[idx];
+          return !(result.status === 'fulfilled' && result.value === 'expired');
+        });
+        if (validSubs.length !== subs.length) {
+          await env.SUBS.put(subsKey, JSON.stringify(validSubs));
+        }
+
+        // 3. Also send via ntfy.sh as backup
         const ntfyTopic = 'pulse-' + room.toLowerCase();
         try {
           await fetch('https://ntfy.sh/' + ntfyTopic, {
@@ -35,56 +89,38 @@ export default {
               'Priority': '4',
               'Tags': 'heart',
               'Click': 'https://sem13bot.github.io/Pulseus/',
-              'Actions': 'view, Open pulse, https://sem13bot.github.io/Pulseus/'
             },
             body: body || ''
           });
-        } catch (e) {
-          // ntfy.sh might be down, that's ok — message is stored
-        }
+        } catch (e) { /* ntfy backup, ignore errors */ }
 
-        return json({ ok: true, stored: recent.length });
+        const sent = pushResults.filter(r => r.status === 'fulfilled' && r.value === 'sent').length;
+        return json({ ok: true, pushSent: sent, totalSubs: subs.length, stored: true });
       }
 
-      // GET /messages/:room?since=timestamp&userId=xxx — fetch missed messages
+      // GET /messages/:room — fetch missed messages
       if (url.pathname.startsWith('/messages/') && request.method === 'GET') {
         const room = url.pathname.split('/messages/')[1];
         if (!room) return json({ error: 'missing room' }, 400);
-
         const since = parseInt(url.searchParams.get('since') || '0');
         const userId = url.searchParams.get('userId') || '';
-
-        const key = `msg:${room}`;
-        const msgs = JSON.parse(await env.SUBS.get(key) || '[]');
-
-        // Filter: only messages after 'since' timestamp, exclude sender's own messages
-        const filtered = msgs.filter(m => m.ts > since && m.senderId !== userId);
-
-        return json({ messages: filtered });
+        const msgs = JSON.parse(await env.SUBS.get(`msg:${room}`) || '[]');
+        return json({ messages: msgs.filter(m => m.ts > since && m.senderId !== userId) });
       }
 
-      // GET /health
-      if (url.pathname === '/health') {
-        return json({ status: 'ok', service: 'pulse-push', version: 2 });
-      }
-
-      // GET /ntfy-topic/:room — returns the ntfy.sh subscription URL
+      // GET /ntfy-topic/:room
       if (url.pathname.startsWith('/ntfy-topic/')) {
-        const room = url.pathname.split('/ntfy-topic/')[1];
-        return json({
-          topic: 'pulse-' + (room || '').toLowerCase(),
-          subscribeUrl: 'https://ntfy.sh/pulse-' + (room || '').toLowerCase(),
-          appUrl: 'https://ntfy.sh/pulse-' + (room || '').toLowerCase()
-        });
+        const room = url.pathname.split('/ntfy-topic/')[1] || '';
+        return json({ topic: 'pulse-' + room.toLowerCase(), url: 'https://ntfy.sh/pulse-' + room.toLowerCase() });
       }
 
-      return json({
-        service: 'pulse-push',
-        version: 2,
-        endpoints: ['/send', '/messages/:room', '/ntfy-topic/:room', '/health']
-      });
+      if (url.pathname === '/health') {
+        return json({ status: 'ok', version: 3 });
+      }
+
+      return json({ service: 'pulse-push', version: 3 });
     } catch (e) {
-      return json({ error: e.message }, 500);
+      return json({ error: e.message, stack: e.stack }, 500);
     }
   }
 };

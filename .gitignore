@@ -1,1 +1,3 @@
 push-server/.wrangler/
+push-server/node_modules/
+push-server/.wrangler/
