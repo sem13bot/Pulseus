@@ -1246,46 +1246,78 @@ function joinRoom(){
 function shareCode(){const c=S.g('room'),url=location.href.split('?')[0],msg=`Join me on pulse 💌\n${T().yourCodeLbl}: ${c}\n${url}`;if(navigator.share)navigator.share({title:'pulse',text:msg});else{navigator.clipboard?.writeText(msg);toast(T().copied)}}
 
 // ═══ MQTT ════════════════════════════════════════════════════
-var _mqttFirstConnect=true;
+var _mqttBrokerIdx=0;
+var _mqttBrokers=[
+  'wss://broker.hivemq.com:8884/mqtt',
+  'wss://broker.emqx.io:8084/mqtt'
+];
 function connectMQTT(cb){
   if(typeof mqtt==='undefined'){setTimeout(()=>connectMQTT(cb),300);return}
-  const cid='pulse_'+uid();
-  // IMPORTANT: Use ONE broker only so both partners are always on the same one
-  const BROKER='wss://broker.hivemq.com:8884/mqtt';
-  const FALLBACK='wss://broker.emqx.io:8084/mqtt';
-  var useFallback=false;
+  var cid='pulse_'+uid();
+  var _cbCalled=false;
+  function callCb(){if(!_cbCalled){_cbCalled=true;if(cb)cb()}}
 
-  function tryConnect(url){
-    mq=mqtt.connect(url,{clientId:cid,clean:true,connectTimeout:10000,reconnectPeriod:2000,keepalive:15});
-    mq.on('connect',()=>{
-      mqOk=true;setConn(true);
-      if(_mqttFirstConnect){_mqttFirstConnect=false;if(cb)cb()}
-      else{
-        // Reconnected — resubscribe to room and re-announce
-        var room=S.g('room');
-        if(room){
-          mq.subscribe(topic(room),{qos:1});
-          mq.subscribe(htopic(room),{qos:1});
-          mq.subscribe(jtopic(room),{qos:1});
-          // Re-announce presence so partner knows we're online
-          mq.publish(jtopic(room),JSON.stringify({type:'join',userId:S.g('userId'),name:S.g('userName'),ts:Date.now()}),{qos:1});
-        }
+  // Always show the app after 3 seconds max, even if not connected yet
+  setTimeout(callCb,3000);
+
+  function tryBroker(idx){
+    var url=_mqttBrokers[idx%_mqttBrokers.length];
+    console.log('[MQTT] Trying broker:',url);
+    setConn(false,'connecting…');
+
+    // Kill previous connection if exists
+    if(mq){try{mq.end(true)}catch(e){}}
+
+    mq=mqtt.connect(url,{clientId:cid,clean:true,connectTimeout:5000,reconnectPeriod:3000,keepalive:15});
+
+    var _connectTimeout=setTimeout(function(){
+      // This broker didn't connect in 5 seconds — try next one
+      console.log('[MQTT] Broker timeout, trying next...');
+      mq.end(true);
+      tryBroker(idx+1);
+    },6000);
+
+    mq.on('connect',function(){
+      clearTimeout(_connectTimeout);
+      mqOk=true;_mqttBrokerIdx=idx%_mqttBrokers.length;
+      setConn(true);
+      console.log('[MQTT] Connected to',url);
+      callCb();
+      // Always resubscribe on any connect
+      var room=S.g('room');
+      if(room){
+        mq.subscribe(topic(room),{qos:1});
+        mq.subscribe(htopic(room),{qos:1});
+        mq.subscribe(jtopic(room),{qos:1});
+        mq.publish(jtopic(room),JSON.stringify({type:'join',userId:S.g('userId'),name:S.g('userName'),ts:Date.now()}),{qos:1});
       }
     });
-    mq.on('error',()=>{
+
+    mq.on('error',function(){
       setConn(false);
-      // If primary fails on first connect, try fallback ONCE
-      if(_mqttFirstConnect&&!useFallback){
-        useFallback=true;mq.end(true);
-        tryConnect(FALLBACK);
-      }
     });
-    mq.on('close',()=>{mqOk=false;setConn(false)});
-    mq.on('reconnect',()=>{var t=document.getElementById('ctxt'),d=document.getElementById('sdot');if(t)t.textContent='reconnecting…';if(d)d.style.background='#C0A888'});
+
+    mq.on('close',function(){
+      mqOk=false;setConn(false);
+    });
+
+    mq.on('reconnect',function(){
+      setConn(false,'reconnecting…');
+    });
+
+    mq.on('offline',function(){
+      mqOk=false;setConn(false);
+    });
   }
-  tryConnect(BROKER);
+
+  tryBroker(0);
 }
-function setConn(ok){const d=document.getElementById('sdot'),t=document.getElementById('ctxt');if(!d||!t)return;d.style.background=ok?'#60A850':'#C0B0A0';t.textContent=ok?'connected':'offline'}
+function setConn(ok,txt){
+  var d=document.getElementById('sdot'),t=document.getElementById('ctxt');
+  if(!d||!t)return;
+  if(ok){d.style.background='#60A850';t.textContent='connected'}
+  else{d.style.background=txt?'#C0A888':'#C0B0A0';t.textContent=txt||'offline'}
+}
 var _lastPubTime=0;
 function pub(room,payload){
   return new Promise((res,rej)=>{
@@ -1324,15 +1356,17 @@ function enterApp(){
 
 // ═══ SUBSCRIBE ════════════════════════════════════════════════
 var _subRoomActive=false;
+var _subRoomMq=null; // track which mq object has the listener
 function subRoom(){
   var room=S.g('room');
   if(!room||!mq)return;
   mq.subscribe(topic(room),{qos:1});
   mq.subscribe(htopic(room),{qos:1});
   mq.subscribe(jtopic(room),{qos:1});
-  // Prevent duplicate listeners
-  if(_subRoomActive)return;
+  // Re-attach listener if mq object changed (broker switch)
+  if(_subRoomActive&&_subRoomMq===mq)return;
   _subRoomActive=true;
+  _subRoomMq=mq;
   mq.on('message',function(t,buf){
     var curRoom=S.g('room'),curId=S.g('userId');
     if(!curRoom)return;
@@ -2255,30 +2289,35 @@ window.addEventListener('DOMContentLoaded',()=>{
     }
   });
 
-  setTimeout(()=>{
-    const l=document.getElementById('loading');
-    if(l&&l.style.display!=='none'){
-      l.style.display='none';
-      if(hasConns){loadActiveConn()}
-      else{curRel=RELATIONS['romantic'];applyRelTheme();goScreen('lang')}
-    }
-  },7000);
-
   document.addEventListener('visibilitychange',()=>{
     if(document.visibilityState==='visible'){
-      // Always try to reconnect when coming back from background
-      if(!mqOk&&mq)try{mq.reconnect()}catch(e){}
-      // Re-subscribe to make sure we don't miss messages
-      var room=S.g('room');
-      if(room&&mq&&mqOk){
-        mq.subscribe(topic(room),{qos:1});
-        mq.subscribe(htopic(room),{qos:1});
-        mq.subscribe(jtopic(room),{qos:1});
-      }
-      // Update connection indicator
-      setConn(mqOk);
       // Restart audio keepalive (it may have been suspended)
       if(typeof startAudioKeepAlive==='function')startAudioKeepAlive();
+
+      if(mqOk&&mq){
+        // Connected — just re-subscribe to make sure
+        var room=S.g('room');
+        if(room){
+          mq.subscribe(topic(room),{qos:1});
+          mq.subscribe(htopic(room),{qos:1});
+          mq.subscribe(jtopic(room),{qos:1});
+        }
+        setConn(true);
+      } else {
+        // Offline — immediately try to reconnect
+        setConn(false,'reconnecting…');
+        if(mq)try{mq.reconnect()}catch(e){}
+        // If still offline after 3 seconds, force full reconnect cycle
+        setTimeout(function(){
+          if(!mqOk){
+            console.log('[MQTT] Still offline after resume, full reconnect');
+            connectMQTT(function(){
+              var room=S.g('room');
+              if(room)subRoom();
+            });
+          }
+        },3000);
+      }
     }
   });
   // Also handle iOS page show event (back/forward cache)
@@ -2318,12 +2357,40 @@ window.addEventListener('DOMContentLoaded',()=>{
     if(mq&&mqOk&&S.g('room'))try{mq.publish('pulse/ping/'+S.g('userId'),'1',{qos:0})}catch(e){}
   },15000);
 
-  // 4. Aggressive reconnection check every 10 seconds
+  // 4. Aggressive reconnection — if offline for 10s, try switching broker
+  var _offlineSince=0;
   setInterval(()=>{
-    if(mq&&!mqOk&&S.g('room')){
-      try{mq.reconnect()}catch(e){}
+    if(!mqOk){
+      if(!_offlineSince)_offlineSince=Date.now();
+      // If offline for more than 10 seconds, try reconnecting
+      if(mq)try{mq.reconnect()}catch(e){}
+      // If offline for more than 20 seconds, try a different broker entirely
+      if(Date.now()-_offlineSince>20000){
+        _offlineSince=Date.now();
+        _mqttBrokerIdx=(_mqttBrokerIdx+1)%_mqttBrokers.length;
+        var url=_mqttBrokers[_mqttBrokerIdx];
+        console.log('[MQTT] Switching to broker:',url);
+        if(mq)try{mq.end(true)}catch(e){}
+        var cid='pulse_'+uid();
+        mq=mqtt.connect(url,{clientId:cid,clean:true,connectTimeout:5000,reconnectPeriod:3000,keepalive:15});
+        mq.on('connect',function(){
+          mqOk=true;setConn(true);
+          // Re-subscribe and re-attach message handler via subRoom
+          subRoom();
+          var room=S.g('room');
+          if(room){
+            mq.publish(jtopic(room),JSON.stringify({type:'join',userId:S.g('userId'),name:S.g('userName'),ts:Date.now()}),{qos:1});
+          }
+        });
+        mq.on('error',function(){setConn(false)});
+        mq.on('close',function(){mqOk=false;setConn(false)});
+        mq.on('reconnect',function(){setConn(false,'reconnecting…')});
+        mq.on('offline',function(){mqOk=false;setConn(false)});
+      }
+    } else {
+      _offlineSince=0;
     }
-  },10000);
+  },5000);
 });
 </script>
 <script>
