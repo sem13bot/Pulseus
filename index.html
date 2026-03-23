@@ -513,6 +513,7 @@ body{font-family:var(--hand);display:flex;justify-content:center;overscroll-beha
       <div id="conns-list"></div>
       <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
         <button onclick="askNotif()" id="notif-btn" style="background:none;border:1.5px solid rgba(139,94,60,.22);border-radius:50px;padding:12px 18px;color:rgba(139,94,60,.7);font-family:var(--sans);font-size:13px;cursor:pointer;width:100%">Enable lock screen notifications 🔔</button>
+        <button onclick="openOfflinePush()" id="offline-push-btn" style="background:linear-gradient(135deg,#4A90D9,#357ABD);border:none;border-radius:50px;padding:12px 18px;color:white;font-family:var(--sans);font-size:13px;cursor:pointer;width:100%;box-shadow:0 4px 12px rgba(74,144,217,.3)">📲 Push notifications (even when closed)</button>
         <button onclick="disconnect()" id="disconnect-btn" style="background:none;border:none;color:rgba(180,60,60,.45);font-family:var(--hand);font-size:12px;cursor:pointer;padding:3px 0;text-align:start">Disconnect active &amp; remove</button>
         <button onclick="resetEverything()" style="background:none;border:none;color:rgba(180,40,40,.55);font-family:var(--hand);font-size:13px;font-weight:600;cursor:pointer;padding:3px 0;text-align:start">🔄 Reset everything &amp; start fresh</button>
       </div>
@@ -920,53 +921,76 @@ let customEMs={};  // per-user custom emotions: stored in localStorage + MQTT to
 let obStep=0;
 
 // ═══ PUSH NOTIFICATIONS CONFIG ═══
-// Set this to your Cloudflare Worker URL after deploying push-server/
-// Example: 'https://pulse-push.yourname.workers.dev'
 var PUSH_SERVER = 'https://pulse-push.semionkh2003.workers.dev';
-var VAPID_PUBLIC_KEY = 'BB1SPfVQ61sJ6rnISO6icswRRYBaMXBblyxB_hqv6lWex0SjidQn0Nxd_EJQMa4J3s6BG2fXqKUD-CuUDkKK3zc';
 
-// Subscribe to Web Push notifications (called after entering app)
-async function subscribePush(){
-  if(!PUSH_SERVER)return;
-  if(!('serviceWorker'in navigator)||!('PushManager'in window))return;
-  try{
-    var reg=await navigator.serviceWorker.ready;
-    var sub=await reg.pushManager.getSubscription();
-    if(!sub){
-      // Convert VAPID key from base64url to Uint8Array
-      var padding='='.repeat((4-VAPID_PUBLIC_KEY.length%4)%4);
-      var b64=VAPID_PUBLIC_KEY.replace(/-/g,'+').replace(/_/g,'/')+padding;
-      var raw=atob(b64);
-      var arr=new Uint8Array(raw.length);
-      for(var i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);
-
-      sub=await reg.pushManager.subscribe({
-        userVisibleOnly:true,
-        applicationServerKey:arr
-      });
-    }
-    // Register subscription with push server for this room
-    var room=S.g('room');
-    if(room&&sub){
-      fetch(PUSH_SERVER+'/subscribe',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({room:room,subscription:sub.toJSON()})
-      }).catch(function(){});
-    }
-  }catch(e){console.log('[Push] Subscribe error:',e)}
-}
-
-// Send push notification via server (for when partner's browser is closed)
+// Send message via push server (stored + ntfy.sh push notification)
 function sendPushNotif(title,body,icon){
   if(!PUSH_SERVER)return;
   var room=S.g('room');
   if(!room)return;
-  fetch(PUSH_SERVER+'/notify',{
+  fetch(PUSH_SERVER+'/send',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({room:room,title:title,body:body,icon:icon||'♡',senderId:S.g('userId')})
-  }).catch(function(){});
+    body:JSON.stringify({room:room,title:title,body:body,icon:icon||'♡',senderId:S.g('userId'),senderName:S.g('userName')})
+  }).catch(function(e){console.log('[Push] Send error:',e)});
+}
+
+// Fetch missed messages from server (called on app load + resume)
+var _lastFetchTs=0;
+function fetchMissedMessages(){
+  if(!PUSH_SERVER)return;
+  var room=S.g('room'),userId=S.g('userId');
+  if(!room)return;
+  var since=_lastFetchTs||parseInt(S.g('lastSeen')||'0');
+  fetch(PUSH_SERVER+'/messages/'+room+'?since='+since+'&userId='+userId)
+    .then(function(r){return r.json()})
+    .then(function(data){
+      if(data.messages&&data.messages.length>0){
+        data.messages.forEach(function(m){
+          // Show each missed message as a notification
+          if(m.senderId!==userId){
+            localNotif({sym:m.icon||'♡',name:m.title||'pulse',ac:'#B04060'},m.body||'',m.senderName||'');
+          }
+        });
+        _lastFetchTs=Date.now();
+        S.s('lastSeen',String(_lastFetchTs));
+      }
+    }).catch(function(){});
+}
+
+// Subscribe to ntfy.sh for real-time backup delivery via SSE
+var _ntfySource=null;
+function connectNtfy(){
+  var room=S.g('room'),userId=S.g('userId');
+  if(!room)return;
+  if(_ntfySource){try{_ntfySource.close()}catch(e){}}
+  var ntfyTopic='pulse-'+room.toLowerCase();
+  try{
+    _ntfySource=new EventSource('https://ntfy.sh/'+ntfyTopic+'/sse');
+    _ntfySource.onmessage=function(ev){
+      try{
+        var d=JSON.parse(ev.data);
+        if(d.event==='message'&&d.title){
+          // Only show if not from ourselves (check title doesn't start with our name)
+          var myName=S.g('userName')||'';
+          if(myName&&d.title.startsWith(myName))return;
+          // Show notification
+          if(Notification.permission==='granted'&&document.visibilityState!=='visible'){
+            if('serviceWorker'in navigator&&navigator.serviceWorker.controller){
+              navigator.serviceWorker.ready.then(function(reg){
+                reg.showNotification(d.title,{body:d.message||'',requireInteraction:true,vibrate:[200,100,200,100,400],tag:'ntfy-'+Date.now(),renotify:true,data:{url:'./index.html'}});
+              });
+            }
+          }
+          if(navigator.vibrate)navigator.vibrate([100,50,100,50,200]);
+        }
+      }catch(e){}
+    };
+    _ntfySource.onerror=function(){
+      // Reconnect after 5 seconds
+      setTimeout(function(){connectNtfy()},5000);
+    };
+  }catch(e){}
 }
 
 const S={g:k=>localStorage.getItem('px_'+k),s:(k,v)=>localStorage.setItem('px_'+k,v),d:k=>localStorage.removeItem('px_'+k)};
@@ -1397,7 +1421,7 @@ function enterApp(){
   subRoom();
   goScreen('send');eIdx=0;updateEmUI();buildVG();renderHistory();
   setTimeout(askNotif,2000);
-  setTimeout(subscribePush,3000);
+  setTimeout(function(){fetchMissedMessages();connectNtfy()},2000);
   updateAnimalUI();
   // Init tree for romantic couples
   if((S.g('relation')||'romantic')==='romantic')initTree();
@@ -1513,6 +1537,29 @@ async function askNotif(){
     }
   } else {
     toast('Notifications blocked — enable in browser settings');
+  }
+}
+function openOfflinePush(){
+  var room=S.g('room');
+  if(!room){toast('Connect first');return}
+  var ntfyTopic='pulse-'+room.toLowerCase();
+  var url='https://ntfy.sh/'+ntfyTopic;
+  var msgs={
+    en:'To get push notifications even when the browser is closed:\n\n1. Open the link below\n2. Click "Subscribe" on the page\n3. Allow notifications\n\nOR install the free ntfy app from your app store and subscribe to topic: '+ntfyTopic,
+    he:'כדי לקבל התראות גם כשהדפדפן סגור:\n\n1. פתח את הלינק למטה\n2. לחץ "Subscribe" בדף\n3. אשר התראות\n\nאו התקן את אפליקציית ntfy (חינמית) והירשם לטופיק: '+ntfyTopic,
+    ru:'Для пуш-уведомлений когда браузер закрыт:\n\n1. Откройте ссылку ниже\n2. Нажмите "Subscribe"\n3. Разрешите уведомления\n\nИли установите бесплатное приложение ntfy и подпишитесь на топик: '+ntfyTopic,
+    ar:'للحصول على إشعارات عند إغلاق المتصفح:\n\n1. افتح الرابط أدناه\n2. اضغط "Subscribe"\n3. اسمح بالإشعارات\n\nأو ثبّت تطبيق ntfy المجاني واشترك في: '+ntfyTopic
+  };
+  var localMsg=msgs[curLang]||msgs.en;
+  // Open in new tab
+  window.open(url,'_blank');
+  // Also show sharable message
+  var shareMsg=localMsg+'\n\n'+url;
+  if(navigator.share){
+    navigator.share({title:'pulse push notifications',text:shareMsg,url:url});
+  } else {
+    navigator.clipboard?.writeText(url);
+    toast('Link copied! Share with partner too: '+url);
   }
 }
 function localNotif(em,msg,fromName){
@@ -2348,6 +2395,9 @@ window.addEventListener('DOMContentLoaded',()=>{
     if(document.visibilityState==='visible'){
       // Restart audio keepalive (it may have been suspended)
       if(typeof startAudioKeepAlive==='function')startAudioKeepAlive();
+
+      // Fetch missed messages on resume
+      fetchMissedMessages();
 
       if(mqOk&&mq){
         // Connected — just re-subscribe to make sure
